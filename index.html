@@ -19,14 +19,16 @@
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
         input { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; }
         
-        /* Video Container */
+        /* Video & Canvas Overlay Container */
         .video-container { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
         video { width: 100%; height: auto; display: block; }
+        /* The canvas perfectly overlays the video to draw the green boxes */
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
         button { background: #0b57d0; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
         button:hover { background: #0842a0; }
         
-        #status { margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; }
+        #status { margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; transition: background 0.3s; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .neutral { background: #e2e3e5; color: #383d41; }
@@ -47,6 +49,7 @@
 
     <div class="video-container">
         <video id="webcam" playsinline autoplay muted></video>
+        <canvas id="qr-canvas"></canvas>
     </div>
     <button id="startBtn" onclick="initCamera()">Start Camera</button>
 
@@ -59,11 +62,11 @@
         // ==========================================
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2n6y06SohdigV-CmLxfDrniKNKDV1QRCeHaOdjGaekIJU1l1wNC7qGjm7u-TathGH/exec"; 
         
-        // Track last scan timestamps per distinct QR code string
         const codeScanHistory = {}; 
-        let videoElement;
+        let videoElement, canvasElement, canvasCtx;
         let isScanning = false;
         let barcodeDetector = null;
+        let audioCtx; // For the beep sound
 
         document.addEventListener("DOMContentLoaded", () => {
             const savedSheet = localStorage.getItem("targetSheetUrl");
@@ -76,8 +79,9 @@
             document.getElementById("cooldown").addEventListener("input", saveSettings);
 
             videoElement = document.getElementById("webcam");
+            canvasElement = document.getElementById("qr-canvas");
+            canvasCtx = canvasElement.getContext("2d");
 
-            // Initialize Native BarcodeDetector if supported
             if ('BarcodeDetector' in window) {
                 barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
             }
@@ -88,14 +92,47 @@
             localStorage.setItem("cooldown", document.getElementById("cooldown").value);
         }
 
+        // Generate a clean beep sound using the browser's audio engine
+        function playSuccessFeedback() {
+            try {
+                // Haptic vibration (Android primarily)
+                if (navigator.vibrate) navigator.vibrate(150); 
+                
+                // Audio Beep
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // Beep pitch (800Hz)
+                
+                // Quick volume fade out so it doesn't click
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } catch (err) {
+                console.log("Audio/Vibration not supported", err);
+            }
+        }
+
         async function initCamera() {
             try {
+                // Initialize audio context on first user click to bypass browser auto-play blocks
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" } 
                 });
                 videoElement.srcObject = stream;
                 document.getElementById("startBtn").style.display = "none";
-                updateStatus("Camera active. Scanning for multiple QR codes...", "neutral");
+                updateStatus("Camera active. Scanning for QR codes...", "neutral");
                 isScanning = true;
                 requestAnimationFrame(scanFrame);
             } catch (err) {
@@ -107,20 +144,35 @@
             if (!isScanning) return;
 
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                // Sync canvas resolution with camera resolution
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                
+                // Clear previous frame's drawings
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
                 try {
                     let detectedTexts = [];
 
                     if (barcodeDetector) {
-                        // Native multi-QR detection
                         const barcodes = await barcodeDetector.detect(videoElement);
-                        detectedTexts = barcodes.map(b => b.rawValue);
+                        
+                        // Draw green boxes around detected codes
+                        barcodes.forEach(barcode => {
+                            detectedTexts.push(barcode.rawValue);
+                            
+                            // Draw bounding box
+                            const { x, y, width, height } = barcode.boundingBox;
+                            canvasCtx.strokeStyle = "#00FF00"; // Neon green
+                            canvasCtx.lineWidth = 6;
+                            canvasCtx.strokeRect(x, y, width, height);
+                        });
                     } else {
-                        // Fallback using ZXing library
-                        const canvas = document.createElement('canvas');
-                        canvas.width = videoElement.videoWidth;
-                        canvas.height = videoElement.videoHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        // Fallback ZXing logic (does not draw boxes)
+                        const scanCanvas = document.createElement('canvas');
+                        scanCanvas.width = videoElement.videoWidth;
+                        scanCanvas.height = videoElement.videoHeight;
+                        scanCanvas.getContext('2d').drawImage(videoElement, 0, 0, scanCanvas.width, scanCanvas.height);
                         
                         const hints = new Map();
                         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
@@ -128,13 +180,11 @@
                         reader.setHints(hints);
                         
                         try {
-                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(scanCanvas);
                             const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
                             const result = reader.decode(binaryBitmap);
                             if (result) detectedTexts.push(result.getText());
-                        } catch (e) {
-                            // No QR found in frame
-                        }
+                        } catch (e) { /* No code found */ }
                     }
 
                     if (detectedTexts.length > 0) {
@@ -144,8 +194,6 @@
                     console.error("Scan error:", err);
                 }
             }
-
-            // Loop continuously (~10 scans per second)
             setTimeout(() => { requestAnimationFrame(scanFrame); }, 100);
         }
 
@@ -164,16 +212,17 @@
             codesArray.forEach(qrText => {
                 const lastScannedTime = codeScanHistory[qrText] || 0;
 
-                // Check cooldown timer specifically for THIS QR text
                 if (now - lastScannedTime >= cooldownSeconds * 1000) {
-                    codeScanHistory[qrText] = now; // Update timestamp
+                    codeScanHistory[qrText] = now; 
                     newScansCount++;
                     sendToSheet(qrText, targetSheetUrl);
                 }
             });
 
+            // If at least one NEW code was scanned, trigger the beep and vibration
             if (newScansCount > 0) {
-                updateStatus(`Detected ${codesArray.length} QR code(s). Sent ${newScansCount} new code(s)!`, "success");
+                playSuccessFeedback();
+                updateStatus(`Detected ${codesArray.length} code(s). Sent ${newScansCount} new code(s)!`, "success");
             }
         }
 
