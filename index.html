@@ -3,53 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner</title>
+    <title>Multi-QR Scanner</title>
     
     <!-- App Install Requirements -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b57d0">
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg">
 
-    <!-- QR Library -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- ZXing Library for fallback Multi-QR scanning -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
     
     <style>
         body { font-family: system-ui, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
         .card { background: #f4f4f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
         input { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; }
-        #reader { width: 100%; margin-top: 20px; border-radius: 8px; overflow: hidden; }
+        
+        /* Video Container */
+        .video-container { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
+        video { width: 100%; height: auto; display: block; }
+        
+        button { background: #0b57d0; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        button:hover { background: #0842a0; }
+        
         #status { margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .neutral { background: #e2e3e5; color: #383d41; }
-        .log { margin-top: 10px; font-size: 0.9em; color: #555; max-height: 150px; overflow-y: auto; }
+        .log { margin-top: 10px; font-size: 0.9em; color: #555; max-height: 180px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <h2>QR Scanner</h2>
+    <h2>Multi-QR Scanner</h2>
 
     <div class="card">
         <label>Target Google Sheet URL:</label>
         <input type="text" id="targetSheetUrl" placeholder="Paste Google Sheet link here...">
         
-        <label>Same-Code Cooldown (Seconds):</label>
+        <label>Scan Cooldown Per Code (Seconds):</label>
         <input type="number" id="cooldown" value="5" min="1">
     </div>
 
-    <div id="reader"></div>
-    <div id="status" class="neutral">Waiting for settings...</div>
+    <div class="video-container">
+        <video id="webcam" playsinline autoplay muted></video>
+    </div>
+    <button id="startBtn" onclick="initCamera()">Start Camera</button>
+
+    <div id="status" class="neutral">Tap "Start Camera" to begin</div>
     <div class="log" id="logList"></div>
 
     <script>
         // ==========================================
         // PASTE YOUR APPS SCRIPT URL HERE
         // ==========================================
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2n6y06SohdigV-CmLxfDrniKNKDV1QRCeHaOdjGaekIJU1l1wNC7qGjm7u-TathGH/exec"; 
+        const APPS_SCRIPT_URL = "PASTE_YOUR_URL_HERE"; 
         
-        // This object acts as a memory bank for specific QR codes
-        let recentScans = {};
+        // Track last scan timestamps per distinct QR code string
+        const codeScanHistory = {}; 
+        let videoElement;
+        let isScanning = false;
+        let barcodeDetector = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             const savedSheet = localStorage.getItem("targetSheetUrl");
@@ -61,12 +75,12 @@
             document.getElementById("targetSheetUrl").addEventListener("input", saveSettings);
             document.getElementById("cooldown").addEventListener("input", saveSettings);
 
-            const scanner = new Html5QrcodeScanner("reader", { 
-                fps: 10, 
-                qrbox: { width: 250, height: 250 },
-                rememberLastUsedCamera: false 
-            });
-            scanner.render(onScanSuccess);
+            videoElement = document.getElementById("webcam");
+
+            // Initialize Native BarcodeDetector if supported
+            if ('BarcodeDetector' in window) {
+                barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+            }
         });
 
         function saveSettings() {
@@ -74,45 +88,68 @@
             localStorage.setItem("cooldown", document.getElementById("cooldown").value);
         }
 
-        function updateStatus(msg, type) {
-            const statusEl = document.getElementById("status");
-            statusEl.textContent = msg;
-            statusEl.className = type;
-            
-            const logList = document.getElementById("logList");
-            const logItem = document.createElement("div");
-            logItem.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logList.prepend(logItem);
-        }
-
-        function triggerFeedback() {
-            if (navigator.vibrate) {
-                navigator.vibrate(200); 
-            }
-
+        async function initCamera() {
             try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const audioCtx = new AudioContext();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-
-                oscillator.type = 'sine'; 
-                oscillator.frequency.value = 880; 
-
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
-                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1); 
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.1); 
-            } catch (e) {
-                console.log("Audio feedback failed: ", e);
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                videoElement.srcObject = stream;
+                document.getElementById("startBtn").style.display = "none";
+                updateStatus("Camera active. Scanning for multiple QR codes...", "neutral");
+                isScanning = true;
+                requestAnimationFrame(scanFrame);
+            } catch (err) {
+                updateStatus("Error accessing camera: " + err.message, "error");
             }
         }
 
-        function onScanSuccess(decodedText) {
+        async function scanFrame() {
+            if (!isScanning) return;
+
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                try {
+                    let detectedTexts = [];
+
+                    if (barcodeDetector) {
+                        // Native multi-QR detection
+                        const barcodes = await barcodeDetector.detect(videoElement);
+                        detectedTexts = barcodes.map(b => b.rawValue);
+                    } else {
+                        // Fallback using ZXing library
+                        const canvas = document.createElement('canvas');
+                        canvas.width = videoElement.videoWidth;
+                        canvas.height = videoElement.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        
+                        const hints = new Map();
+                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+                        const reader = new ZXing.MultiFormatReader();
+                        reader.setHints(hints);
+                        
+                        try {
+                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+                            const result = reader.decode(binaryBitmap);
+                            if (result) detectedTexts.push(result.getText());
+                        } catch (e) {
+                            // No QR found in frame
+                        }
+                    }
+
+                    if (detectedTexts.length > 0) {
+                        processDetectedCodes(detectedTexts);
+                    }
+                } catch (err) {
+                    console.error("Scan error:", err);
+                }
+            }
+
+            // Loop continuously (~10 scans per second)
+            setTimeout(() => { requestAnimationFrame(scanFrame); }, 100);
+        }
+
+        function processDetectedCodes(codesArray) {
             const targetSheetUrl = document.getElementById("targetSheetUrl").value;
             const cooldownSeconds = parseInt(document.getElementById("cooldown").value, 10) || 5;
             const now = Date.now();
@@ -122,33 +159,51 @@
                 return;
             }
 
-            // Check if THIS SPECIFIC code was scanned recently
-            const lastTimeThisCodeWasScanned = recentScans[decodedText] || 0;
+            let newScansCount = 0;
 
-            if (now - lastTimeThisCodeWasScanned < cooldownSeconds * 1000) { 
-                return; // Ignore if the exact same code is within its cooldown window
+            codesArray.forEach(qrText => {
+                const lastScannedTime = codeScanHistory[qrText] || 0;
+
+                // Check cooldown timer specifically for THIS QR text
+                if (now - lastScannedTime >= cooldownSeconds * 1000) {
+                    codeScanHistory[qrText] = now; // Update timestamp
+                    newScansCount++;
+                    sendToSheet(qrText, targetSheetUrl);
+                }
+            });
+
+            if (newScansCount > 0) {
+                updateStatus(`Detected ${codesArray.length} QR code(s). Sent ${newScansCount} new code(s)!`, "success");
             }
-            
-            // Record the new time for this specific code
-            recentScans[decodedText] = now;
-            
-            triggerFeedback();
-            
-            updateStatus(`Scanned: ${decodedText}. Sending...`, "success");
+        }
 
+        function sendToSheet(qrText, targetSheetUrl) {
             fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', 
+                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({ 
-                    qrText: decodedText,
+                    qrText: qrText,
                     targetSheetUrl: targetSheetUrl 
                 })
             }).then(() => {
-                updateStatus(`Saved: ${decodedText}`, "success");
+                logMessage(`Saved: ${qrText}`);
             }).catch(err => {
-                updateStatus(`Network error while saving.`, "error");
+                logMessage(`Error saving: ${qrText}`);
             });
+        }
+
+        function updateStatus(msg, type) {
+            const statusEl = document.getElementById("status");
+            statusEl.textContent = msg;
+            statusEl.className = type;
+        }
+
+        function logMessage(msg) {
+            const logList = document.getElementById("logList");
+            const logItem = document.createElement("div");
+            logItem.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logList.prepend(logItem);
         }
 
         if ('serviceWorker' in navigator) {
