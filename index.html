@@ -5,28 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multi-QR Scanner</title>
     
-    <!-- App Install Requirements -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0b57d0">
-    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg">
-
-    <!-- ZXing Library for fallback Multi-QR scanning -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
     
     <style>
         body { font-family: system-ui, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
         .card { background: #f4f4f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
-        input { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
         
-        /* Video & Canvas Overlay Container */
         .video-container { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
         video { width: 100%; height: auto; display: block; }
-        /* The canvas perfectly overlays the video to draw the green boxes */
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
-        button { background: #0b57d0; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .button-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { background: #0b57d0; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; }
         button:hover { background: #0842a0; }
+        
+        #scanSheetBtn { background: #e37400; }
+        #scanSheetBtn:hover { background: #b05700; }
+        #scanSheetBtn.active { background: #137333; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        
+        #cameraSelect { display: none; margin-top: 10px; }
         
         #status { margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; transition: background 0.3s; }
         .success { background: #d4edda; color: #155724; }
@@ -41,9 +46,13 @@
 
     <div class="card">
         <label>Target Google Sheet URL:</label>
-        <input type="text" id="targetSheetUrl" placeholder="Paste Google Sheet link here...">
+        <input type="text" id="targetSheetUrl" placeholder="Paste link or scan QR code below...">
         
-        <label>Scan Cooldown Per Code (Seconds):</label>
+        <div class="button-group">
+            <button id="scanSheetBtn" onclick="toggleSheetScanMode()">📷 Scan Sheet QR Code</button>
+        </div>
+
+        <label style="margin-top: 15px;">Scan Cooldown Per Code (Seconds):</label>
         <input type="number" id="cooldown" value="5" min="1">
     </div>
 
@@ -51,6 +60,8 @@
         <video id="webcam" playsinline autoplay muted></video>
         <canvas id="qr-canvas"></canvas>
     </div>
+    
+    <select id="cameraSelect"></select>
     <button id="startBtn" onclick="initCamera()">Start Camera</button>
 
     <div id="status" class="neutral">Tap "Start Camera" to begin</div>
@@ -58,7 +69,7 @@
 
     <script>
         // ==========================================
-        // PASTE YOUR APPS SCRIPT URL HERE
+        // PASTE YOUR APPS SCRIPT WEB APP URL HERE
         // ==========================================
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2n6y06SohdigV-CmLxfDrniKNKDV1QRCeHaOdjGaekIJU1l1wNC7qGjm7u-TathGH/exec"; 
         
@@ -66,7 +77,10 @@
         let videoElement, canvasElement, canvasCtx;
         let isScanning = false;
         let barcodeDetector = null;
-        let audioCtx; // For the beep sound
+        let audioCtx; 
+        let currentStream = null; 
+        let isScanningForSheetUrl = false; 
+        let isLockedOut = false; // Prevents accidental double scans
 
         document.addEventListener("DOMContentLoaded", () => {
             const savedSheet = localStorage.getItem("targetSheetUrl");
@@ -85,6 +99,8 @@
             if ('BarcodeDetector' in window) {
                 barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
             }
+            
+            document.getElementById("cameraSelect").addEventListener("change", initCamera);
         });
 
         function saveSettings() {
@@ -92,13 +108,25 @@
             localStorage.setItem("cooldown", document.getElementById("cooldown").value);
         }
 
-        // Generate a clean beep sound using the browser's audio engine
+        function toggleSheetScanMode() {
+            isScanningForSheetUrl = !isScanningForSheetUrl;
+            const btn = document.getElementById("scanSheetBtn");
+            
+            if (isScanningForSheetUrl) {
+                btn.textContent = "🛑 Tap to Cancel Sheet Scan";
+                btn.classList.add("active");
+                updateStatus("Point camera at your Sheet URL QR code...", "neutral");
+            } else {
+                btn.textContent = "📷 Scan Sheet QR Code";
+                btn.classList.remove("active");
+                updateStatus("Camera active. Scanning normal data codes.", "neutral");
+            }
+        }
+
         function playSuccessFeedback() {
             try {
-                // Haptic vibration (Android primarily)
                 if (navigator.vibrate) navigator.vibrate(150); 
                 
-                // Audio Beep
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
 
@@ -106,9 +134,8 @@
                 const gainNode = audioCtx.createGain();
                 
                 oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // Beep pitch (800Hz)
+                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); 
                 
-                // Quick volume fade out so it doesn't click
                 gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
 
@@ -118,25 +145,72 @@
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.1);
             } catch (err) {
-                console.log("Audio/Vibration not supported", err);
+                console.log("Audio/Vibration error", err);
+            }
+        }
+
+        async function populateCameraList() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const cameraSelect = document.getElementById("cameraSelect");
+                
+                cameraSelect.innerHTML = ''; 
+                
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+                
+                if (currentStream) {
+                    const activeTrack = currentStream.getVideoTracks()[0];
+                    if (activeTrack) {
+                        const activeSettings = activeTrack.getSettings();
+                        if (activeSettings.deviceId) {
+                            cameraSelect.value = activeSettings.deviceId;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error enumerating devices:", err);
             }
         }
 
         async function initCamera() {
             try {
-                // Initialize audio context on first user click to bypass browser auto-play blocks
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                videoElement.srcObject = stream;
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                const cameraSelect = document.getElementById("cameraSelect");
+                const selectedDeviceId = cameraSelect.value;
+                
+                const constraints = {
+                    video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }
+                };
+                
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = currentStream;
+                
                 document.getElementById("startBtn").style.display = "none";
+                
+                if (cameraSelect.options.length === 0) {
+                    await populateCameraList();
+                    cameraSelect.style.display = "block";
+                }
+
                 updateStatus("Camera active. Scanning for QR codes...", "neutral");
-                isScanning = true;
-                requestAnimationFrame(scanFrame);
+                
+                if (!isScanning) {
+                    isScanning = true;
+                    requestAnimationFrame(scanFrame);
+                }
             } catch (err) {
-                updateStatus("Error accessing camera: " + err.message, "error");
+                updateStatus("Error accessing camera. Please check browser permissions.", "error");
             }
         }
 
@@ -144,57 +218,67 @@
             if (!isScanning) return;
 
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-                // Sync canvas resolution with camera resolution
                 canvasElement.width = videoElement.videoWidth;
                 canvasElement.height = videoElement.videoHeight;
-                
-                // Clear previous frame's drawings
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-                try {
-                    let detectedTexts = [];
+                if (!isLockedOut) {
+                    try {
+                        let detectedTexts = [];
 
-                    if (barcodeDetector) {
-                        const barcodes = await barcodeDetector.detect(videoElement);
-                        
-                        // Draw green boxes around detected codes
-                        barcodes.forEach(barcode => {
-                            detectedTexts.push(barcode.rawValue);
-                            
-                            // Draw bounding box
-                            const { x, y, width, height } = barcode.boundingBox;
-                            canvasCtx.strokeStyle = "#00FF00"; // Neon green
-                            canvasCtx.lineWidth = 6;
-                            canvasCtx.strokeRect(x, y, width, height);
-                        });
-                    } else {
-                        // Fallback ZXing logic (does not draw boxes)
-                        const scanCanvas = document.createElement('canvas');
-                        scanCanvas.width = videoElement.videoWidth;
-                        scanCanvas.height = videoElement.videoHeight;
-                        scanCanvas.getContext('2d').drawImage(videoElement, 0, 0, scanCanvas.width, scanCanvas.height);
-                        
-                        const hints = new Map();
-                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
-                        const reader = new ZXing.MultiFormatReader();
-                        reader.setHints(hints);
-                        
-                        try {
-                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(scanCanvas);
-                            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-                            const result = reader.decode(binaryBitmap);
-                            if (result) detectedTexts.push(result.getText());
-                        } catch (e) { /* No code found */ }
-                    }
+                        if (barcodeDetector) {
+                            const barcodes = await barcodeDetector.detect(videoElement);
+                            barcodes.forEach(barcode => {
+                                detectedTexts.push(barcode.rawValue);
+                                const { x, y, width, height } = barcode.boundingBox;
+                                canvasCtx.strokeStyle = isScanningForSheetUrl ? "#FFA500" : "#00FF00"; 
+                                canvasCtx.lineWidth = 6;
+                                canvasCtx.strokeRect(x, y, width, height);
+                            });
+                        } else {
+                            const scanCanvas = document.createElement('canvas');
+                            scanCanvas.width = videoElement.videoWidth;
+                            scanCanvas.height = videoElement.videoHeight;
+                            scanCanvas.getContext('2d').drawImage(videoElement, 0, 0, scanCanvas.width, scanCanvas.height);
+                            const hints = new Map();
+                            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+                            const reader = new ZXing.MultiFormatReader();
+                            reader.setHints(hints);
+                            try {
+                                const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(scanCanvas);
+                                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+                                const result = reader.decode(binaryBitmap);
+                                if (result) detectedTexts.push(result.getText());
+                            } catch (e) {}
+                        }
 
-                    if (detectedTexts.length > 0) {
-                        processDetectedCodes(detectedTexts);
-                    }
-                } catch (err) {
-                    console.error("Scan error:", err);
+                        if (detectedTexts.length > 0) {
+                            if (isScanningForSheetUrl) {
+                                processSheetUrlScan(detectedTexts[0]); 
+                            } else {
+                                processDetectedCodes(detectedTexts);
+                            }
+                        }
+                    } catch (err) {}
                 }
             }
             setTimeout(() => { requestAnimationFrame(scanFrame); }, 100);
+        }
+
+        function processSheetUrlScan(urlText) {
+            playSuccessFeedback();
+            document.getElementById("targetSheetUrl").value = urlText;
+            saveSettings();
+            
+            // Lock scanning for 2 seconds so you have time to move the camera away
+            isLockedOut = true;
+            updateStatus("Sheet URL set! Move camera away...", "success");
+            logMessage(`Target Sheet set to: ${urlText}`);
+
+            setTimeout(() => {
+                isLockedOut = false;
+                toggleSheetScanMode(); // Safely toggle back to normal mode
+            }, 2000);
         }
 
         function processDetectedCodes(codesArray) {
@@ -203,7 +287,7 @@
             const now = Date.now();
 
             if (!targetSheetUrl) {
-                updateStatus("Error: Paste a Google Sheet link above.", "error");
+                updateStatus("Error: Paste a Google Sheet link or scan a Sheet QR code first.", "error");
                 return;
             }
 
@@ -215,31 +299,27 @@
                 if (now - lastScannedTime >= cooldownSeconds * 1000) {
                     codeScanHistory[qrText] = now; 
                     newScansCount++;
-                    sendToSheet(qrText, targetSheetUrl);
+                    
+                    fetch(APPS_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ 
+                            qrText: qrText,
+                            targetSheetUrl: targetSheetUrl 
+                        })
+                    }).then(() => {
+                        logMessage(`Saved: ${qrText}`);
+                    }).catch(() => {
+                        logMessage(`Error saving: ${qrText}`);
+                    });
                 }
             });
 
-            // If at least one NEW code was scanned, trigger the beep and vibration
             if (newScansCount > 0) {
                 playSuccessFeedback();
                 updateStatus(`Detected ${codesArray.length} code(s). Sent ${newScansCount} new code(s)!`, "success");
             }
-        }
-
-        function sendToSheet(qrText, targetSheetUrl) {
-            fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ 
-                    qrText: qrText,
-                    targetSheetUrl: targetSheetUrl 
-                })
-            }).then(() => {
-                logMessage(`Saved: ${qrText}`);
-            }).catch(err => {
-                logMessage(`Error saving: ${qrText}`);
-            });
         }
 
         function updateStatus(msg, type) {
@@ -253,10 +333,6 @@
             const logItem = document.createElement("div");
             logItem.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
             logList.prepend(logItem);
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
         }
     </script>
 </body>
