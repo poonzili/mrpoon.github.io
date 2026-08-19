@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Multi-Runner Track Tracker & Pacing Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+            --danger-color: #e74c3c;
+            --mass-start-color: #e67e22;
+            --pause-color: #e67e22;
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        /* Instructions Accordion Panel */
+        .instructions-panel {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            overflow: hidden;
+            border-left: 6px solid var(--primary-color);
+        }
+
+        .instructions-header {
+            padding: 12px 20px;
+            background: #ebf5fb;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .instructions-content {
+            padding: 15px 20px;
+            display: block;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            color: #34495e;
+            background: #ffffff;
+        }
+
+        .instructions-content ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .instructions-content li {
+            margin-bottom: 6px;
+        }
+
+        /* Setup Panel */
+        .setup-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 40px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: #2c3e50;
+        }
+
+        .form-group-checkbox input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s, opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        /* Control Bar */
+        .control-bar {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+
+        .btn-mass-start {
+            background-color: var(--mass-start-color);
+            font-size: 1.1rem;
+            padding: 12px 24px;
+            box-shadow: 0 4px 6px rgba(230, 126, 34, 0.2);
+        }
+
+        .btn-mass-pause {
+            background-color: #f39c12;
+            font-size: 1.1rem;
+            padding: 12px 24px;
+        }
+
+        .btn-snapshot {
+            background-color: #9b59b6;
+            font-size: 1.1rem;
+            padding: 12px 24px;
+        }
+
+        /* Runner Layouts */
+        .runners-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+
+        @media (min-width: 750px) {
+            .grid-layout {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1100px) {
+            .grid-layout {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .list-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* Runner Card */
+        .runner-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 8px solid #e0e0e0;
+            transition: border-color 0.4s ease, background-color 0.4s ease;
+            position: relative;
+        }
+
+        .card-header-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .card-name-input {
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            background: transparent;
+            color: #2c3e50;
+            padding: 4px 0;
+            flex: 2;
+            min-width: 130px;
+            border-bottom: 1px dashed transparent;
+        }
+        .card-name-input:focus {
+            border-bottom-color: var(--primary-color);
+            outline: none;
+            background: #fafafa;
+        }
+
+        .card-select {
+            padding: 4px;
+            font-size: 0.85rem;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 75px;
+        }
+
+        .time-display-container {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .total-time-display {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #2c3e50;
+            font-family: monospace;
+        }
+
+        .current-lap-display {
+            font-size: 1.05rem;
+            color: #7f8c8d;
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        .stats-display {
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        /* NAPFA Target Box */
+        .napfa-preview-box {
+            font-size: 0.8rem;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            border-radius: 5px;
+            margin: 8px 0;
+            color: #334155;
+        }
+        
+        .napfa-preview-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+            color: #1e293b;
+        }
+
+        .napfa-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            text-align: center;
+        }
+
+        .napfa-grid-item {
+            background: white;
+            padding: 3px 2px;
+            border-radius: 3px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.75rem;
+        }
+        
+        .napfa-grid-item strong {
+            display: block;
+            color: #475569;
+        }
+
+        .napfa-target-box {
+            font-size: 0.82rem;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin: 8px 0;
+            color: #166534;
+        }
+
+        .badges-wrapper {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .feedback-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .feedback-consistent { background: #e3f2fd; color: #0d47a1; }
+        .feedback-faster { background: #e8f5e9; color: #1b5e20; }
+        .feedback-slower { background: #ffebee; color: #b71c1c; }
+        .feedback-paused { background: #fef3c7; color: #92400e; }
+
+        .napfa-badge { font-weight: bold; }
+        .napfa-a { background: #dcfce7; color: #166534; }
+        .napfa-b { background: #e0f2fe; color: #0369a1; }
+        .napfa-c { background: #fef9c3; color: #713f12; }
+        .napfa-d { background: #ffedd5; color: #9a3412; }
+        .napfa-e { background: #f3e8ff; color: #6b21a8; }
+        .napfa-fail { background: #fee2e2; color: #991b1b; }
+
+        .runner-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .runner-actions button {
+            flex: 1;
+            padding: 8px 4px;
+            font-size: 0.88rem;
+        }
+
+        .btn-start { background-color: var(--success-color); }
+        .btn-lap { background-color: var(--primary-color); }
+        .btn-pause { background-color: var(--pause-color); }
+        .btn-undo { background-color: #7f8c8d; }
+
+        button:disabled {
+            background-color: #bdc3c7 !important;
+            cursor: not-allowed;
+            box-shadow: none !important;
+        }
+
+        /* Snapshot Modal & Charts Container */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            max-width: 650px;
+            width: 92%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .close-modal {
+            float: right;
+            cursor: pointer;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+
+        .snapshot-text-area {
+            background-color: #ffffff;
+            color: #2c3e50;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            line-height: 1.35;
+            overflow-x: auto;
+            white-space: pre;
+            margin-top: 15px;
+        }
+
+        .charts-wrapper {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .chart-container {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .chart-title {
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .modal-action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-copy { background-color: #2ecc71; flex: 1; }
+        .btn-image { background-color: #e67e22; flex: 1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>⏱️ Multi-Runner Lap Timer</h1>
+    <p class="subtitle">Customizable Track Tracker & Pacing Charts</p>
+
+    <div class="instructions-panel">
+        <div class="instructions-header" id="toggleInstructions">
+            <span>📖 How to Use / Instructions</span>
+            <span id="instructionsIcon">▲</span>
+        </div>
+        <div class="instructions-content" id="instructionsBody">
+            <ol>
+                <li><strong>Configuration:</strong> Set the total number of <strong>Runners</strong> and target <strong>Laps</strong>. Toggle NAPFA Mode on/off as needed. Click <strong>Initialize Track</strong>.</li>
+                <li><strong>Student Profiles:</strong> Customize names, gender, and age on each runner card. Target score brackets auto-update in NAPFA mode.</li>
+                <li><strong>Starting the Run:</strong> Click <strong>🏁 Mass Start All</strong> for a group start, or click <strong>Start</strong> individually.</li>
+                <li><strong>Logging Laps:</strong> Click <strong>Lap</strong> each time a student crosses the finish line. Audio cues will announce progress.</li>
+                <li><strong>Pausing:</strong> Use the <strong>Pause/Resume</strong> button on individual cards for rest or mid-run adjustments. Click <strong>⏸️ Pause All Active</strong> to pause everyone at once.</li>
+                <li><strong>Reports & Export:</strong> Click <strong>Take Snapshot</strong> at any time to generate pacing charts, time tables, and downloadable summary images.</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="setup-panel">
+        <div class="form-group">
+            <label for="numRunners">Runners (1-40):</label>
+            <input type="number" id="numRunners" min="1" max="40" value="2">
+        </div>
+        <div class="form-group">
+            <label for="numLaps">Total Laps:</label>
+            <input type="number" id="numLaps" min="1" value="6">
+        </div>
+        <div class="form-group">
+            <label for="layoutSelect">Display Layout:</label>
+            <select id="layoutSelect">
+                <option value="grid-layout">Grid View</option>
+                <option value="list-layout">List View</option>
+            </select>
+        </div>
+        <div class="form-group-checkbox">
+            <input type="checkbox" id="napfaModeToggle" checked>
+            <label for="napfaModeToggle">Enable NAPFA 2.4km Scoring</label>
+        </div>
+        <button id="btnInitialize">Initialize Track</button>
+    </div>
+
+    <div class="control-bar">
+        <button id="btnMassStart" class="btn-mass-start" disabled>🏁 Mass Start All</button>
+        <button id="btnMassPause" class="btn-mass-pause" disabled>⏸️ Pause All Active</button>
+        <button id="btnSnapshot" class="btn-snapshot" disabled>Take Snapshot</button>
+    </div>
+
+    <div id="runnersContainer" class="runners-container grid-layout"></div>
+</div>
+
+<div id="snapshotModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" id="closeModal">&times;</span>
+        <h2 id="modalTitle">📊 Performance Report</h2>
+        <div class="snapshot-text-area" id="snapshotTextOutput"></div>
+        
+        <div class="charts-wrapper" id="modalChartsContainer"></div>
+
+        <div class="modal-action-buttons">
+            <button class="btn-copy" id="btnCopyText">Copy Text Data</button>
+            <button class="btn-image" id="btnSaveImage">Save Report Image</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const napfaStandards = {
+        male: {
+            12: { A: 701,  B: 770,  C: 840,  D: 910,  E: 990 },
+            13: { A: 681,  B: 740,  C: 810,  D: 880,  E: 950 },
+            14: { A: 661,  B: 720,  C: 780,  D: 850,  E: 920 },
+            15: { A: 641,  B: 700,  C: 760,  D: 820,  E: 880 },
+            16: { A: 631,  B: 690,  C: 740,  D: 800,  E: 850 },
+            17: { A: 621,  B: 670,  C: 720,  D: 770,  E: 820 },
+            18: { A: 621,  B: 670,  C: 710,  D: 760,  E: 810 },
+            19: { A: 621,  B: 660,  C: 700,  D: 750,  E: 800 }
+        },
+        female: {
+            12: { A: 931,  B: 1000, C: 1070, D: 1140, E: 1210 },
+            13: { A: 891,  B: 960,  C: 1020, D: 1080, E: 1150 },
+            14: { A: 861,  B: 920,  C: 980,  D: 1040, E: 1100 },
+            15: { A: 851,  B: 910,  C: 970,  D: 1030, E: 1090 },
+            16: { A: 841,  B: 900,  C: 960,  D: 1020, E: 1070 },
+            17: { A: 841,  B: 890,  C: 950,  D: 1000, E: 1050 },
+            18: { A: 841,  B: 890,  C: 940,  D: 990,  E: 1040 },
+            19: { A: 861,  B: 890,  C: 930,  D: 980,  E: 1030 }
+        }
+    };
+
+    let totalLaps = 6;
+    let runnersData = [];
+    let globalTimerInterval = null;
+    let isNapfaMode = true;
+
+    // Elements
+    const numRunnersInput = document.getElementById('numRunners');
+    const numLapsInput = document.getElementById('numLaps');
+    const layoutSelect = document.getElementById('layoutSelect');
+    const napfaModeToggle = document.getElementById('napfaModeToggle');
+    const btnInitialize = document.getElementById('btnInitialize');
+    const btnMassStart = document.getElementById('btnMassStart');
+    const btnMassPause = document.getElementById('btnMassPause');
+    const btnSnapshot = document.getElementById('btnSnapshot');
+    const runnersContainer = document.getElementById('runnersContainer');
+    const snapshotModal = document.getElementById('snapshotModal');
+    const closeModal = document.getElementById('closeModal');
+    const snapshotTextOutput = document.getElementById('snapshotTextOutput');
+    const modalChartsContainer = document.getElementById('modalChartsContainer');
+    const btnCopyText = document.getElementById('btnCopyText');
+    const btnSaveImage = document.getElementById('btnSaveImage');
+    const modalTitle = document.getElementById('modalTitle');
+    
+    // Instructions Toggle Logic
+    const toggleInstructions = document.getElementById('toggleInstructions');
+    const instructionsBody = document.getElementById('instructionsBody');
+    const instructionsIcon = document.getElementById('instructionsIcon');
+
+    toggleInstructions.addEventListener('click', () => {
+        if (instructionsBody.style.display === 'none') {
+            instructionsBody.style.display = 'block';
+            instructionsIcon.innerText = '▲';
+        } else {
+            instructionsBody.style.display = 'none';
+            instructionsIcon.innerText = '▼';
+        }
+    });
+
+    function triggerHaptic() {
+        if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    function unlockVoiceEngine() {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const promptToken = new SpeechSynthesisUtterance('');
+            window.speechSynthesis.speak(promptToken);
+        }
+    }
+
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.05;
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    window.updateRunnerMetadata = function(id, key, val) {
+        const runner = runnersData.find(r => r.id === id);
+        if (runner) {
+            if (key === 'name') runner.name = val.trim() !== "" ? val.trim() : `Runner ${id}`;
+            else if (key === 'gender') runner.gender = val;
+            else if (key === 'age') runner.age = parseInt(val);
+            
+            if (isNapfaMode) renderNapfaPreviewGrid(runner);
+            if (runner.lapsCompleted === totalLaps) updateRunnerUI(runner);
+        }
+    };
+
+    function renderNapfaPreviewGrid(runner) {
+        const gridEl = document.getElementById(`napfa-grid-${runner.id}`);
+        if (!gridEl) return;
+        const bracket = napfaStandards[runner.gender][runner.age];
+        gridEl.innerHTML = `
+            <div class="napfa-grid-item"><strong>A</strong>&lt;${formatSecondsToMMSS(bracket.A)}</div>
+            <div class="napfa-grid-item"><strong>B</strong>&lt;${formatSecondsToMMSS(bracket.B)}</div>
+            <div class="napfa-grid-item"><strong>C</strong>&lt;${formatSecondsToMMSS(bracket.C)}</div>
+            <div class="napfa-grid-item"><strong>D</strong>&lt;${formatSecondsToMMSS(bracket.D)}</div>
+            <div class="napfa-grid-item"><strong>E</strong>&lt;${formatSecondsToMMSS(bracket.E)}</div>
+        `;
+    }
+
+    function getCompletionColor(completed, total) {
+        const percentage = Math.min(completed / total, 1);
+        const r = Math.floor(224 - (percentage * 178));
+        const g = Math.floor(224 + (percentage * 17));
+        const b = Math.floor(224 - (percentage * 178));
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function getPaceFeedback(currentSplit, previousSplit) {
+        if (!previousSplit) return { text: 'First Lap', class: 'feedback-consistent' };
+        const diff = currentSplit - previousSplit;
+        if (Math.abs(diff) <= 300) return { text: 'Consistent', class: 'feedback-consistent' };
+        return diff < 0 ? { text: 'Faster ⚡', class: 'feedback-faster' } : { text: 'Slower 🐢', class: 'feedback-slower' };
+    }
+
+    function formatTime(ms) {
+        if (ms === null || isNaN(ms) || ms < 0) return "00:00.00";
+        const minutes = Math.floor(ms / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+        const centiseconds = Math.floor((ms % 1000) / 10);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatSecondsToMMSS(totalSeconds) {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function computeNapfaPerformance(gender, age, totalDurationMs) {
+        const totalSeconds = Math.floor(totalDurationMs / 1000);
+        const bracket = napfaStandards[gender][age];
+        let grade = 'F';
+        let cssClass = 'napfa-fail';
+        
+        if (totalSeconds <= bracket.A) { grade = 'A'; cssClass = 'napfa-a'; }
+        else if (totalSeconds <= bracket.B) { grade = 'B'; cssClass = 'napfa-b'; }
+        else if (totalSeconds <= bracket.C) { grade = 'C'; cssClass = 'napfa-c'; }
+        else if (totalSeconds <= bracket.D) { grade = 'D'; cssClass = 'napfa-d'; }
+        else if (totalSeconds <= bracket.E) { grade = 'E'; cssClass = 'napfa-e'; }
+
+        let targetFeedback = '';
+        if (grade === 'A') {
+            targetFeedback = "Secured Grade A! Peak performance reached.";
+        } else {
+            const gradesOrder = ['E', 'D', 'C', 'B', 'A'];
+            let nextGrade = 'E';
+            if (grade !== 'F') nextGrade = gradesOrder[gradesOrder.indexOf(grade) + 1];
+            const targetSeconds = bracket[nextGrade];
+            const deficit = totalSeconds - targetSeconds;
+            targetFeedback = `Need -${formatSecondsToMMSS(deficit)} to hit Grade ${nextGrade} (Target: <${formatSecondsToMMSS(targetSeconds)})`;
+        }
+        return { grade, cssClass, targetFeedback };
+    }
+
+    function getRunnerActiveTime(runner, now) {
+        if (!runner.startTime) return 0;
+        if (runner.endTime) return runner.endTime - runner.startTime - runner.totalPausedDuration;
+        const currentPause = runner.isPaused ? (now - runner.pauseStartTime) : 0;
+        return now - runner.startTime - runner.totalPausedDuration - currentPause;
+    }
+
+    function startGlobalClockLoop() {
+        if (globalTimerInterval) clearInterval(globalTimerInterval);
+        globalTimerInterval = setInterval(() => {
+            const now = Date.now();
+            runnersData.forEach(runner => {
+                if (runner.startTime && !runner.endTime) {
+                    const elapsed = getRunnerActiveTime(runner, now);
+                    const clockEl = document.getElementById(`total-time-${runner.id}`);
+                    if (clockEl) clockEl.innerText = formatTime(elapsed);
+
+                    const currentLapEl = document.getElementById(`current-lap-time-${runner.id}`);
+                    if (currentLapEl && runner.lapsCompleted < totalLaps) {
+                        const lapElapsed = elapsed - runner.accumulatedActiveTimeAtLastLap;
+                        currentLapEl.innerText = `(Lap ${runner.lapsCompleted + 1}: ${formatTime(lapElapsed).slice(0, -3)})`;
+                    }
+                }
+            });
+        }, 40);
+    }
+
+    function initializeTrack() {
+        unlockVoiceEngine();
+        if (globalTimerInterval) clearInterval(globalTimerInterval);
+        
+        const count = Math.min(Math.max(parseInt(numRunnersInput.value) || 1, 1), 40);
+        totalLaps = Math.max(parseInt(numLapsInput.value) || 1, 1);
+        isNapfaMode = napfaModeToggle.checked;
+        
+        runnersContainer.innerHTML = '';
+        runnersContainer.className = `runners-container ${layoutSelect.value}`;
+        runnersData = [];
+
+        for (let i = 1; i <= count; i++) {
+            runnersData.push({
+                id: i,
+                name: `Runner ${i}`,
+                gender: 'male',
+                age: 13,
+                startTime: null,
+                endTime: null,
+                isPaused: false,
+                pauseStartTime: 0,
+                totalPausedDuration: 0,
+                accumulatedActiveTimeAtLastLap: 0,
+                lapsCompleted: 0,
+                splits: [],
+                splitDurations: []
+            });
+
+            const card = document.createElement('div');
+            card.className = 'runner-card';
+            card.id = `runner-card-${i}`;
+            card.style.borderLeftColor = getCompletionColor(0, totalLaps);
+            
+            card.innerHTML = `
+                <div class="runner-info">
+                    <div class="card-header-inputs">
+                        <input type="text" class="card-name-input" id="card-name-input-${i}" placeholder="Runner ${i}" oninput="updateRunnerMetadata(${i}, 'name', this.value)">
+                        <select class="card-select" onchange="updateRunnerMetadata(${i}, 'gender', this.value)" style="display: ${isNapfaMode ? 'block' : 'none'};">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                        <select class="card-select" onchange="updateRunnerMetadata(${i}, 'age', this.value)" style="display: ${isNapfaMode ? 'block' : 'none'};">
+                            <option value="12">Age 12</option>
+                            <option value="13" selected>Age 13</option>
+                            <option value="14">Age 14</option>
+                            <option value="15">Age 15</option>
+                            <option value="16">Age 16</option>
+                            <option value="17">Age 17</option>
+                            <option value="18">Age 18</option>
+                            <option value="19">Age 19</option>
+                        </select>
+                    </div>
+                    
+                    <div class="napfa-preview-box" id="napfa-preview-container-${i}" style="display: ${isNapfaMode ? 'block' : 'none'};">
+                        <div class="napfa-preview-title">🎯 NAPFA Targets Required:</div>
+                        <div class="napfa-grid" id="napfa-grid-${i}"></div>
+                    </div>
+
+                    <div class="time-display-container">
+                        <div class="total-time-display" id="total-time-${i}">00:00.00</div>
+                        <div class="current-lap-display" id="current-lap-time-${i}"></div>
+                    </div>
+                    <div class="stats-display">Laps: <span id="completed-${i}">0</span> / ${totalLaps} (<span id="remaining-${i}">${totalLaps}</span> remaining)</div>
+                    <div class="stats-display">Prev Split: <span id="prev-split-${i}">--:--.--</span></div>
+                    <div class="napfa-target-box" id="napfa-box-${i}" style="display:none;"></div>
+                    <div class="badges-wrapper">
+                        <span id="feedback-${i}" class="feedback-badge" style="display:none;"></span>
+                        <span id="napfa-badge-${i}" class="feedback-badge napfa-badge" style="display:none;"></span>
+                    </div>
+                </div>
+                <div class="runner-actions">
+                    <button class="btn-start" id="start-${i}" onclick="startRunner(${i})">Start</button>
+                    <button class="btn-lap" id="lap-${i}" onclick="triggerLap(${i})" disabled>Lap</button>
+                    <button class="btn-pause" id="pause-${i}" onclick="togglePauseRunner(${i})" disabled>Pause</button>
+                    <button class="btn-undo" id="undo-${i}" onclick="undoLap(${i})" disabled>Undo</button>
+                </div>
+            `;
+            runnersContainer.appendChild(card);
+            if (isNapfaMode) renderNapfaPreviewGrid(runnersData[i-1]);
+        }
+        btnSnapshot.disabled = false;
+        btnMassStart.disabled = false;
+        btnMassPause.disabled = true;
+        startGlobalClockLoop();
+    }
+
+    window.startRunner = function(id) {
+        triggerHaptic();
+        unlockVoiceEngine();
+        const runner = runnersData.find(r => r.id === id);
+        if (runner.startTime) return;
+
+        runner.startTime = Date.now();
+        document.getElementById(`start-${id}`).disabled = true;
+        document.getElementById(`lap-${id}`).disabled = false;
+        document.getElementById(`pause-${id}`).disabled = false;
+        speak(`${runner.name} started.`);
+        checkMassControlsStatus();
+    };
+
+    window.massStartAllRunners = function() {
+        triggerHaptic();
+        unlockVoiceEngine();
+        const stamp = Date.now();
+        let startedAny = false;
+
+        runnersData.forEach(runner => {
+            if (!runner.startTime) {
+                runner.startTime = stamp;
+                const startBtn = document.getElementById(`start-${runner.id}`);
+                const lapBtn = document.getElementById(`lap-${runner.id}`);
+                const pauseBtn = document.getElementById(`pause-${runner.id}`);
+                if (startBtn) startBtn.disabled = true;
+                if (lapBtn) lapBtn.disabled = false;
+                if (pauseBtn) pauseBtn.disabled = false;
+                startedAny = true;
+            }
+        });
+        if (startedAny) speak("All runners started!");
+        checkMassControlsStatus();
+    };
+
+    window.togglePauseRunner = function(id) {
+        triggerHaptic();
+        const runner = runnersData.find(r => r.id === id);
+        if (!runner.startTime || runner.endTime) return;
+
+        const now = Date.now();
+        const pauseBtn = document.getElementById(`pause-${id}`);
+        const lapBtn = document.getElementById(`lap-${id}`);
+
+        if (!runner.isPaused) {
+            runner.isPaused = true;
+            runner.pauseStartTime = now;
+            pauseBtn.innerText = "Resume";
+            pauseBtn.style.backgroundColor = "var(--success-color)";
+            lapBtn.disabled = true;
+            speak(`${runner.name} paused.`);
+        } else {
+            runner.totalPausedDuration += (now - runner.pauseStartTime);
+            runner.isPaused = false;
+            runner.pauseStartTime = 0;
+            pauseBtn.innerText = "Pause";
+            pauseBtn.style.backgroundColor = "var(--pause-color)";
+            if (runner.lapsCompleted < totalLaps) lapBtn.disabled = false;
+            speak(`${runner.name} resumed.`);
+        }
+        updateRunnerUI(runner);
+        checkMassControlsStatus();
+    };
+
+    window.toggleMassPause = function() {
+        triggerHaptic();
+        const runningRunners = runnersData.filter(r => r.startTime && !r.endTime);
+        if (runningRunners.length === 0) return;
+
+        const anyActive = runningRunners.some(r => !r.isPaused);
+        runningRunners.forEach(runner => {
+            if (anyActive && !runner.isPaused) {
+                togglePauseRunner(runner.id);
+            } else if (!anyActive && runner.isPaused) {
+                togglePauseRunner(runner.id);
+            }
+        });
+        checkMassControlsStatus();
+    };
+
+    function checkMassControlsStatus() {
+        btnMassStart.disabled = !runnersData.some(r => !r.startTime);
+        
+        const activeRunners = runnersData.filter(r => r.startTime && !r.endTime);
+        if (activeRunners.length === 0) {
+            btnMassPause.disabled = true;
+            btnMassPause.innerText = "⏸️ Pause All Active";
+        } else {
+            btnMassPause.disabled = false;
+            const anyActive = activeRunners.some(r => !r.isPaused);
+            btnMassPause.innerText = anyActive ? "⏸️ Pause All Active" : "▶️ Resume All Active";
+        }
+    }
+
+    window.triggerLap = function(id) {
+        triggerHaptic();
+        unlockVoiceEngine();
+        const runner = runnersData.find(r => r.id === id);
+        if (!runner.startTime || runner.endTime || runner.isPaused || runner.lapsCompleted >= totalLaps) return;
+
+        const now = Date.now();
+        runner.lapsCompleted++;
+        
+        const activeDuration = getRunnerActiveTime(runner, now);
+        runner.splits.push(activeDuration);
+
+        const lapDuration = activeDuration - runner.accumulatedActiveTimeAtLastLap;
+        runner.splitDurations.push(lapDuration);
+        runner.accumulatedActiveTimeAtLastLap = activeDuration;
+
+        if (runner.lapsCompleted === totalLaps) {
+            runner.endTime = now;
+            document.getElementById(`total-time-${id}`).innerText = formatTime(activeDuration);
+            document.getElementById(`current-lap-time-${id}`).innerText = ""; 
+            document.getElementById(`pause-${id}`).disabled = true;
+        }
+        updateRunnerUI(runner);
+        handleVoiceFeedback(runner);
+        checkMassControlsStatus();
+    };
+
+    window.undoLap = function(id) {
+        triggerHaptic();
+        const runner = runnersData.find(r => r.id === id);
+        if (runner.lapsCompleted === 0) return;
+
+        if (runner.lapsCompleted === totalLaps) {
+            runner.endTime = null;
+            if (!runner.isPaused) document.getElementById(`pause-${id}`).disabled = false;
+        }
+        runner.lapsCompleted--;
+        runner.splits.pop();
+        runner.splitDurations.pop();
+        
+        runner.accumulatedActiveTimeAtLastLap = runner.splits.length > 0 ? runner.splits[runner.splits.length - 1] : 0;
+        updateRunnerUI(runner);
+        checkMassControlsStatus();
+    };
+
+    function updateRunnerUI(runner) {
+        const id = runner.id;
+        const completedSpan = document.getElementById('completed-' + id);
+        const remainingSpan = document.getElementById('remaining-' + id);
+        const prevSplitSpan = document.getElementById('prev-split-' + id);
+        const feedbackBadge = document.getElementById('feedback-' + id);
+        const napfaBadge = document.getElementById('napfa-badge-' + id);
+        const napfaBox = document.getElementById('napfa-box-' + id);
+        const card = document.getElementById('runner-card-' + id);
+        const lapBtn = document.getElementById('lap-' + id);
+        const undoBtn = document.getElementById('undo-' + id);
+
+        completedSpan.innerText = runner.lapsCompleted;
+        remainingSpan.innerText = totalLaps - runner.lapsCompleted;
+        card.style.borderLeftColor = getCompletionColor(runner.lapsCompleted, totalLaps);
+
+        const totalSplits = runner.splitDurations.length;
+        if (runner.isPaused) {
+            feedbackBadge.innerText = 'PAUSED ⏸️';
+            feedbackBadge.className = 'feedback-badge feedback-paused';
+            feedbackBadge.style.display = 'inline-block';
+        } else if (totalSplits > 0) {
+            const latestSplit = runner.splitDurations[totalSplits - 1];
+            prevSplitSpan.innerText = formatTime(latestSplit);
+            const feedback = getPaceFeedback(latestSplit, totalSplits > 1 ? runner.splitDurations[totalSplits - 2] : null);
+            feedbackBadge.innerText = feedback.text;
+            feedbackBadge.className = `feedback-badge ${feedback.class}`;
+            feedbackBadge.style.display = 'inline-block';
+        } else {
+            prevSplitSpan.innerText = "--:--.--";
+            feedbackBadge.style.display = 'none';
+        }
+
+        if (runner.lapsCompleted >= totalLaps) {
+            document.getElementById(`current-lap-time-${id}`).innerText = "";
+        }
+
+        if (isNapfaMode && runner.lapsCompleted === totalLaps && runner.endTime) {
+            const duration = getRunnerActiveTime(runner, runner.endTime);
+            const napfa = computeNapfaPerformance(runner.gender, runner.age, duration);
+            napfaBadge.innerText = `NAPFA: ${napfa.grade}`;
+            napfaBadge.className = `feedback-badge ${napfa.cssClass}`;
+            napfaBadge.style.display = 'inline-block';
+            napfaBox.innerHTML = `🏁 <strong>${napfa.targetFeedback}</strong>`;
+            napfaBox.style.display = 'block';
+        } else {
+            napfaBadge.style.display = 'none';
+            napfaBox.style.display = 'none';
+        }
+
+        undoBtn.disabled = runner.lapsCompleted === 0;
+        lapBtn.disabled = runner.lapsCompleted >= totalLaps || runner.isPaused;
+    }
+
+    function handleVoiceFeedback(runner) {
+        if (runner.lapsCompleted === totalLaps) {
+            const activeDuration = getRunnerActiveTime(runner, runner.endTime);
+            if (isNapfaMode) {
+                const napfa = computeNapfaPerformance(runner.gender, runner.age, activeDuration);
+                speak(`${runner.name} complete. Grade ${napfa.grade === 'F' ? 'Needs Improvement' : napfa.grade}`);
+            } else {
+                speak(`${runner.name} finished.`);
+            }
+        } else if (runner.lapsCompleted === totalLaps - 1) {
+            speak(`${runner.name}, final lap!`);
+        }
+    }
+
+    function drawPacingGraphOnCanvas(canvas, splitDurations) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        ctx.clearRect(0, 0, width, height);
+
+        const paddingLeft = 55;
+        const paddingRight = 65;
+        const paddingTop = 15;
+        const paddingBottom = 15;
+        
+        const chartWidth = width - paddingLeft - paddingRight;
+        const chartHeight = height - paddingTop - paddingBottom;
+
+        if (!splitDurations || splitDurations.length < 1) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('No lap details logged yet.', width / 2, height / 2);
+            return;
+        }
+
+        const lapSeconds = splitDurations.map(ms => ms / 1000);
+        const speeds = lapSeconds.map(sec => sec > 0 ? (1 / sec) : 0);
+        const maxSpeed = Math.max(...speeds);
+        
+        const totalBarsCount = Math.max(speeds.length, totalLaps);
+        const gapRatio = 0.25; 
+        const totalGaps = totalBarsCount - 1;
+        const barHeight = chartHeight / (totalBarsCount + (totalGaps * gapRatio));
+        const gapHeight = barHeight * gapRatio;
+
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, paddingTop);
+        ctx.lineTo(paddingLeft, height - paddingBottom);
+        ctx.stroke();
+
+        for (let i = 0; i < totalBarsCount; i++) {
+            const yPos = paddingTop + i * (barHeight + gapHeight);
+            
+            ctx.fillStyle = '#64748b';
+            ctx.font = 'bold 11px Helvetica, Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`Lap ${i+1}`, paddingLeft - 8, yPos + barHeight / 2);
+
+            if (i >= speeds.length) {
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fillRect(paddingLeft, yPos, 4, barHeight);
+                continue;
+            }
+
+            const currentSpeed = speeds[i];
+            const barWidth = maxSpeed > 0 ? (currentSpeed / maxSpeed) * chartWidth : 0;
+
+            ctx.fillStyle = '#fc4c02'; 
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(paddingLeft, yPos, barWidth, barHeight, 3);
+            } else {
+                ctx.rect(paddingLeft, yPos, barWidth, barHeight);
+            }
+            ctx.fill();
+
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            const displayLabel = formatSecondsToMMSS(Math.round(lapSeconds[i]));
+            ctx.fillText(displayLabel, paddingLeft + barWidth + 6, yPos + barHeight / 2);
+        }
+    }
+
+    function buildSnapshotText() {
+        let textOutput = `====================================================\n`;
+        const titleStr = isNapfaMode ? "RACE RUNNER REPORT & MOE NAPFA ASSESSMENT" : "TRACK RACE PERFORMANCE REPORT";
+        textOutput += `     ${titleStr}      \n`;
+        textOutput += `====================================================\n\n`;
+
+        runnersData.forEach(runner => {
+            const inputField = document.getElementById(`card-name-input-${runner.id}`);
+            const trueName = (inputField && inputField.value.trim() !== "") ? inputField.value.trim() : runner.name;
+
+            const now = Date.now();
+            const totalTimeMs = getRunnerActiveTime(runner, now);
+            
+            const profileStr = isNapfaMode ? ` (${runner.gender.toUpperCase()}, Age ${runner.age})` : '';
+            textOutput += `RM PROFILE: ${trueName.toUpperCase()}${profileStr}\n`;
+            textOutput += `⏱️ Active Duration: ${formatTime(totalTimeMs)}\n`;
+            textOutput += `🏁 Laps Run: ${runner.lapsCompleted} / ${totalLaps}\n`;
+            
+            if (isNapfaMode && runner.lapsCompleted === totalLaps) {
+                const napfa = computeNapfaPerformance(runner.gender, runner.age, totalTimeMs);
+                textOutput += `🏆 NAPFA Metric Assessment: GRADE ${napfa.grade}\n`;
+                textOutput += `🎯 Standard Target:        ${napfa.targetFeedback}\n`;
+            }
+            textOutput += `----------------------------------------------------\n`;
+            
+            if (!runner.splitDurations || runner.splitDurations.length === 0) {
+                textOutput += `  No active lap records cataloged.\n`;
+            } else {
+                textOutput += `  LAP   | LAP TIME   | CUMULATIVE TIME \n`;
+                textOutput += `  ------|------------|-----------------\n`;
+                runner.splitDurations.forEach((duration, index) => {
+                    const cumulative = runner.splits[index];
+                    textOutput += `  L${(index + 1).toString().padEnd(4, ' ')}| ${formatTime(duration).padEnd(11, ' ')}| ${formatTime(cumulative)}\n`;
+                });
+            }
+            textOutput += `====================================================\n\n`;
+        });
+        return textOutput.trim();
+    }
+
+    function showSnapshot() {
+        triggerHaptic();
+        modalTitle.innerText = isNapfaMode ? "📊 Race & NAPFA Performance Report" : "📊 Race Track Summary Report";
+        snapshotTextOutput.textContent = buildSnapshotText();
+        
+        modalChartsContainer.innerHTML = '';
+
+        runnersData.forEach(runner => {
+            const inputField = document.getElementById(`card-name-input-${runner.id}`);
+            const trueName = (inputField && inputField.value.trim() !== "") ? inputField.value.trim() : runner.name;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chart-container';
+            
+            const title = document.createElement('div');
+            title.className = 'chart-title';
+            title.innerText = `📊 Pacing Bars (Longer Bar = Faster Lap Velocity) - ${trueName}`;
+            
+            const canvasHeightCalculated = Math.max(120, totalLaps * 26 + 30);
+            
+            const canvas = document.createElement('canvas');
+            canvas.id = `chart-canvas-${runner.id}`;
+            canvas.width = 600;
+            canvas.height = canvasHeightCalculated;
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+
+            wrapper.appendChild(title);
+            wrapper.appendChild(canvas);
+            modalChartsContainer.appendChild(wrapper);
+
+            drawPacingGraphOnCanvas(canvas, runner.splitDurations || []);
+        });
+
+        btnCopyText.innerText = "Copy Text Data";
+        btnSaveImage.innerText = "Save Report Image";
+        snapshotModal.style.display = 'flex';
+    }
+
+    function copySnapshotToClipboard() {
+        triggerHaptic();
+        navigator.clipboard.writeText(snapshotTextOutput.textContent)
+            .then(() => { btnCopyText.innerText = "✓ Copied!"; })
+            .catch(err => console.error(err));
+    }
+
+    function captureSnapshotAsImage() {
+        triggerHaptic();
+        const text = snapshotTextOutput.textContent;
+        const lines = text.split('\n');
+        
+        const textCanvas = document.createElement('canvas');
+        const textCtx = textCanvas.getContext('2d');
+        const fontSize = 14;
+        const lineHeight = 20;
+        const padding = 25;
+        
+        textCtx.font = `${fontSize}px "Courier New", Courier, monospace`;
+        
+        let maxTextWidth = 0;
+        lines.forEach(line => {
+            const width = textCtx.measureText(line).width;
+            if (width > maxTextWidth) maxTextWidth = width;
+        });
+        
+        const finalCanvasWidth = Math.max(maxTextWidth + (padding * 2), 650);
+        
+        const dynamicChartHeight = Math.max(120, totalLaps * 26 + 30);
+        const chartBlockHeight = dynamicChartHeight + 40; 
+        
+        const finalCanvasHeight = (lines.length * lineHeight) + (padding * 2) + (runnersData.length * chartBlockHeight);
+        
+        const exportCanvas = document.createElement('canvas');
+        const exportCtx = exportCanvas.getContext('2d');
+        exportCanvas.width = finalCanvasWidth;
+        exportCanvas.height = finalCanvasHeight;
+        
+        exportCtx.fillStyle = '#ffffff'; 
+        exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        
+        exportCtx.fillStyle = '#2c3e50'; 
+        exportCtx.font = `${fontSize}px "Courier New", Courier, monospace`;
+        exportCtx.textBaseline = 'top';
+        
+        lines.forEach((line, index) => {
+            exportCtx.fillText(line, padding, padding + (index * lineHeight));
+        });
+        
+        let currentYOffset = (lines.length * lineHeight) + padding;
+        
+        runnersData.forEach(runner => {
+            const runnerCanvas = document.getElementById(`chart-canvas-${runner.id}`);
+            if (runnerCanvas) {
+                const inputField = document.getElementById(`card-name-input-${runner.id}`);
+                const trueName = (inputField && inputField.value.trim() !== "") ? inputField.value.trim() : runner.name;
+
+                exportCtx.fillStyle = '#1e293b';
+                exportCtx.font = 'bold 14px Arial';
+                exportCtx.fillText(`📊 Pacing Bars (Longer Bar = Faster Lap Velocity) - ${trueName}`, padding, currentYOffset);
+                
+                exportCtx.drawImage(runnerCanvas, padding, currentYOffset + 20, finalCanvasWidth - (padding * 2), dynamicChartHeight);
+                currentYOffset += chartBlockHeight;
+            }
+        });
+        
+        try {
+            exportCanvas.toBlob((blob) => {
+                const fileName = isNapfaMode ? `NAPFA_Analytics_Snapshot_${Date.now()}.png` : `Track_Analytics_Snapshot_${Date.now()}.png`;
+                const file = new File([blob], fileName, { type: 'image/png' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    navigator.share({
+                        files: [file],
+                        title: 'Race Analytics Report',
+                        text: 'Track breakdown stats and visual lap chart.'
+                    })
+                    .then(() => { btnSaveImage.innerText = "✓ Shared!"; })
+                    .catch((err) => console.log("Share canceled", err));
+                } else {
+                    const imgDataUrl = exportCanvas.toDataURL('image/png');
+                    const downloadLink = document.createElement('a');
+                    downloadLink.download = fileName;
+                    downloadLink.href = imgDataUrl;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    btnSaveImage.innerText = "✓ Saved!";
+                }
+            }, 'image/png');
+        } catch (e) {
+            console.error(e);
+            alert("Could not automatically compile image artifact file data.");
+        }
+    }
+
+    btnInitialize.addEventListener('click', () => { triggerHaptic(); initializeTrack(); });
+    btnMassStart.addEventListener('click', massStartAllRunners);
+    btnMassPause.addEventListener('click', toggleMassPause);
+    btnSnapshot.addEventListener('click', showSnapshot);
+    btnCopyText.addEventListener('click', copySnapshotToClipboard);
+    btnSaveImage.addEventListener('click', captureSnapshotAsImage);
+    closeModal.addEventListener('click', () => snapshotModal.style.display = 'none');
+    window.addEventListener('click', (e) => { if (e.target === snapshotModal) snapshotModal.style.display = 'none'; });
+    layoutSelect.addEventListener('change', () => {
+        runnersContainer.className = `runners-container ${layoutSelect.value}`;
+    });
+
+    initializeTrack();
+</script>
+</body>
+</html>
