@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Round Robin Tournament Manager</title>
+  <title>Round Robin Manager</title>
+  <!-- Library for saving as image -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; color: #333; }
-    h1, h2 { border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    h1, h2, h3 { border-bottom: 2px solid #eee; padding-bottom: 8px; }
     .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
-    input[type="text"] { flex: 1; padding: 8px; font-size: 16px; }
+    input[type="text"], input[type="date"] { flex: 1; padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
     button { padding: 8px 16px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
     button:hover { background: #0056b3; }
+    .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+    .btn-secondary { background: #6c757d; } .btn-secondary:hover { background: #5a6268; }
+    .action-bar { display: flex; gap: 10px; margin-top: 15px; wrap: wrap; }
     ul { list-style: none; padding: 0; }
     li { background: #f8f9fa; margin: 5px 0; padding: 8px 12px; border-radius: 4px; display: flex; justify-content: space-between; }
     .match-card { background: #f8f9fa; border-left: 4px solid #007bff; padding: 10px; margin: 8px 0; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
@@ -19,51 +24,83 @@
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background: #007bff; color: white; }
     tr:nth-child(even) { background: #f9f9f9; }
+    #exportContainer { padding: 15px; background: #fff; border-radius: 8px; }
   </style>
 </head>
 <body>
 
-  <h1>Tournament Manager</h1>
+  <!-- Controls for Saving/Resuming Progress -->
+  <div class="action-bar">
+    <button class="btn-secondary" onclick="saveData()">Save Progress</button>
+    <button class="btn-secondary" onclick="loadData()">Load Last Saved Progress</button>
+  </div>
 
-  <!-- 1. Custom Team Input -->
-  <section>
-    <h2>1. Teams</h2>
-    <div class="input-group">
-      <input type="text" id="teamInput" placeholder="Enter team name">
-      <button onclick="addTeam()">Add Team</button>
-    </div>
-    <ul id="teamList"></ul>
-    <button id="generateBtn" onclick="generateFixtures()" style="display:none; width: 100%; margin-top: 10px;">Generate Round Robin Schedule</button>
-  </section>
+  <!-- Main Container (Captured when saving as image) -->
+  <div id="exportContainer">
+    
+    <!-- Tournament Info -->
+    <section>
+      <h1 id="displayTitle">Tournament Manager</h1>
+      <p id="displayDate" style="color: #666; margin-top: -10px;"></p>
+      
+      <div class="input-group">
+        <input type="text" id="tournamentName" placeholder="Tournament Name (e.g. Summer Cup)" oninput="updateHeader()">
+        <input type="date" id="tournamentDate" oninput="updateHeader()">
+      </div>
+    </section>
 
-  <!-- 2. Fixtures & Score Entry -->
-  <section id="fixturesSection" style="display:none;">
-    <h2>2. Matches & Score Entry</h2>
-    <div id="fixturesList"></div>
-  </section>
+    <!-- Custom Team Input -->
+    <section id="teamSetupSection">
+      <h2>1. Teams</h2>
+      <div class="input-group">
+        <input type="text" id="teamInput" placeholder="Enter team name">
+        <button onclick="addTeam()">Add Team</button>
+      </div>
+      <ul id="teamList"></ul>
+      <button id="generateBtn" onclick="generateFixtures()" style="display:none; width: 100%; margin-top: 10px;">Generate Schedule</button>
+    </section>
 
-  <!-- 3. Dynamic Standings Table -->
-  <section id="standingsSection" style="display:none;">
-    <h2>3. Standings</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Team</th>
-          <th>P</th>
-          <th>W</th>
-          <th>D</th>
-          <th>L</th>
-          <th>GD</th>
-          <th>Pts</th>
-        </tr>
-      </thead>
-      <tbody id="standingsBody"></tbody>
-    </table>
-  </section>
+    <!-- Matches & Score Entry -->
+    <section id="fixturesSection" style="display:none;">
+      <h2>2. Matches & Score Entry</h2>
+      <div id="fixturesList"></div>
+    </section>
+
+    <!-- Dynamic Standings Table -->
+    <section id="standingsSection" style="display:none;">
+      <h2>3. Standings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>P</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>GD</th>
+            <th>Pts</th>
+          </tr>
+        </thead>
+        <tbody id="standingsBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- Export as Image Action -->
+  <div class="action-bar" id="imageExportBtn" style="display:none;">
+    <button class="btn-success" onclick="exportAsImage()" style="width: 100%;">Download Snapshot as Image (PNG)</button>
+  </div>
 
   <script>
     let teams = [];
     let matches = [];
+
+    function updateHeader() {
+      const name = document.getElementById('tournamentName').value;
+      const date = document.getElementById('tournamentDate').value;
+      document.getElementById('displayTitle').innerText = name.trim() ? name : 'Tournament Manager';
+      document.getElementById('displayDate').innerText = date ? `Date: ${date}` : '';
+    }
 
     function addTeam() {
       const input = document.getElementById('teamInput');
@@ -86,7 +123,6 @@
       renderTeams();
     }
 
-    // 2. Generate Round Robin Fixtures (Berger Tables / Circle Method)
     function generateFixtures() {
       matches = [];
       let pool = [...teams];
@@ -103,16 +139,16 @@
             matches.push({ round: round + 1, home, away, homeScore: null, awayScore: null });
           }
         }
-        pool.splice(1, 0, pool.pop()); // Rotate array elements
+        pool.splice(1, 0, pool.pop());
       }
 
       document.getElementById('fixturesSection').style.display = 'block';
       document.getElementById('standingsSection').style.display = 'block';
+      document.getElementById('imageExportBtn').style.display = 'flex';
       renderFixtures();
       updateStandings();
     }
 
-    // 3. Render Match Inputs
     function renderFixtures() {
       const list = document.getElementById('fixturesList');
       let currentRound = 0;
@@ -144,7 +180,6 @@
       updateStandings();
     }
 
-    // 4. Tabulate Scores & Dynamic Standings Logic
     function updateStandings() {
       let stats = {};
       teams.forEach(t => stats[t] = { played: 0, won: 0, drawn: 0, lost: 0, gd: 0, pts: 0 });
@@ -171,7 +206,6 @@
         }
       });
 
-      // Sort teams by Points (descending), then Goal Difference
       const sortedTeams = Object.keys(stats).sort((a, b) => {
         if (stats[b].pts !== stats[a].pts) return stats[b].pts - stats[a].pts;
         return stats[b].gd - stats[a].gd;
@@ -190,6 +224,54 @@
           <td><strong>${s.pts}</strong></td>
         </tr>`;
       }).join('');
+    }
+
+    // Save state to Browser Storage
+    function saveData() {
+      const state = {
+        name: document.getElementById('tournamentName').value,
+        date: document.getElementById('tournamentDate').value,
+        teams,
+        matches
+      };
+      localStorage.setItem('tournamentData', JSON.stringify(state));
+      alert('Tournament saved successfully!');
+    }
+
+    // Load state from Browser Storage
+    function loadData() {
+      const data = localStorage.getItem('tournamentData');
+      if (!data) return alert('No saved tournament found.');
+      
+      const state = JSON.parse(data);
+      document.getElementById('tournamentName').value = state.name || '';
+      document.getElementById('tournamentDate').value = state.date || '';
+      teams = state.teams || [];
+      matches = state.matches || [];
+
+      updateHeader();
+      renderTeams();
+
+      if (matches.length > 0) {
+        document.getElementById('fixturesSection').style.display = 'block';
+        document.getElementById('standingsSection').style.display = 'block';
+        document.getElementById('imageExportBtn').style.display = 'flex';
+        renderFixtures();
+        updateStandings();
+      }
+      alert('Tournament loaded!');
+    }
+
+    // Export entire tournament UI to image
+    function exportAsImage() {
+      const element = document.getElementById('exportContainer');
+      html2canvas(element).then(canvas => {
+        const link = document.createElement('a');
+        const tName = document.getElementById('tournamentName').value || 'Tournament';
+        link.download = `${tName}-Standings.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
     }
   </script>
 </body>
