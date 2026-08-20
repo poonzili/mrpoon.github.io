@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Round Robin Tournament Manager</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; color: #333; }
+    h1, h2 { border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+    input[type="text"] { flex: 1; padding: 8px; font-size: 16px; }
+    button { padding: 8px 16px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    ul { list-style: none; padding: 0; }
+    li { background: #f8f9fa; margin: 5px 0; padding: 8px 12px; border-radius: 4px; display: flex; justify-content: space-between; }
+    .match-card { background: #f8f9fa; border-left: 4px solid #007bff; padding: 10px; margin: 8px 0; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+    .score-input { width: 50px; text-align: center; padding: 5px; font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #007bff; color: white; }
+    tr:nth-child(even) { background: #f9f9f9; }
+  </style>
+</head>
+<body>
+
+  <h1>Tournament Manager</h1>
+
+  <!-- 1. Custom Team Input -->
+  <section>
+    <h2>1. Teams</h2>
+    <div class="input-group">
+      <input type="text" id="teamInput" placeholder="Enter team name">
+      <button onclick="addTeam()">Add Team</button>
+    </div>
+    <ul id="teamList"></ul>
+    <button id="generateBtn" onclick="generateFixtures()" style="display:none; width: 100%; margin-top: 10px;">Generate Round Robin Schedule</button>
+  </section>
+
+  <!-- 2. Fixtures & Score Entry -->
+  <section id="fixturesSection" style="display:none;">
+    <h2>2. Matches & Score Entry</h2>
+    <div id="fixturesList"></div>
+  </section>
+
+  <!-- 3. Dynamic Standings Table -->
+  <section id="standingsSection" style="display:none;">
+    <h2>3. Standings</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Team</th>
+          <th>P</th>
+          <th>W</th>
+          <th>D</th>
+          <th>L</th>
+          <th>GD</th>
+          <th>Pts</th>
+        </tr>
+      </thead>
+      <tbody id="standingsBody"></tbody>
+    </table>
+  </section>
+
+  <script>
+    let teams = [];
+    let matches = [];
+
+    function addTeam() {
+      const input = document.getElementById('teamInput');
+      const name = input.value.trim();
+      if (name && !teams.includes(name)) {
+        teams.push(name);
+        input.value = '';
+        renderTeams();
+      }
+    }
+
+    function renderTeams() {
+      const list = document.getElementById('teamList');
+      list.innerHTML = teams.map((team, index) => `<li>${team} <span style="color:red;cursor:pointer" onclick="removeTeam(${index})">✕</span></li>`).join('');
+      document.getElementById('generateBtn').style.display = teams.length >= 2 ? 'block' : 'none';
+    }
+
+    function removeTeam(index) {
+      teams.splice(index, 1);
+      renderTeams();
+    }
+
+    // 2. Generate Round Robin Fixtures (Berger Tables / Circle Method)
+    function generateFixtures() {
+      matches = [];
+      let pool = [...teams];
+      if (pool.length % 2 !== 0) pool.push("BYE");
+
+      const numRounds = pool.length - 1;
+      const halfSize = pool.length / 2;
+
+      for (let round = 0; round < numRounds; round++) {
+        for (let i = 0; i < halfSize; i++) {
+          const home = pool[i];
+          const away = pool[pool.length - 1 - i];
+          if (home !== "BYE" && away !== "BYE") {
+            matches.push({ round: round + 1, home, away, homeScore: null, awayScore: null });
+          }
+        }
+        pool.splice(1, 0, pool.pop()); // Rotate array elements
+      }
+
+      document.getElementById('fixturesSection').style.display = 'block';
+      document.getElementById('standingsSection').style.display = 'block';
+      renderFixtures();
+      updateStandings();
+    }
+
+    // 3. Render Match Inputs
+    function renderFixtures() {
+      const list = document.getElementById('fixturesList');
+      let currentRound = 0;
+      let html = '';
+
+      matches.forEach((m, idx) => {
+        if (m.round !== currentRound) {
+          currentRound = m.round;
+          html += `<h3>Round ${currentRound}</h3>`;
+        }
+        html += `
+          <div class="match-card">
+            <span><strong>${m.home}</strong></span>
+            <div>
+              <input type="number" class="score-input" value="${m.homeScore ?? ''}" onchange="updateScore(${idx}, 'home', this.value)">
+              -
+              <input type="number" class="score-input" value="${m.awayScore ?? ''}" onchange="updateScore(${idx}, 'away', this.value)">
+            </div>
+            <span><strong>${m.away}</strong></span>
+          </div>`;
+      });
+      list.innerHTML = html;
+    }
+
+    function updateScore(index, teamType, value) {
+      const val = value === '' ? null : parseInt(value, 10);
+      if (teamType === 'home') matches[index].homeScore = val;
+      if (teamType === 'away') matches[index].awayScore = val;
+      updateStandings();
+    }
+
+    // 4. Tabulate Scores & Dynamic Standings Logic
+    function updateStandings() {
+      let stats = {};
+      teams.forEach(t => stats[t] = { played: 0, won: 0, drawn: 0, lost: 0, gd: 0, pts: 0 });
+
+      matches.forEach(m => {
+        if (m.homeScore !== null && m.awayScore !== null && !isNaN(m.homeScore) && !isNaN(m.awayScore)) {
+          const h = stats[m.home];
+          const a = stats[m.away];
+
+          h.played++; a.played++;
+          h.gd += (m.homeScore - m.awayScore);
+          a.gd += (m.awayScore - m.homeScore);
+
+          if (m.homeScore > m.awayScore) {
+            h.won++; h.pts += 3;
+            a.lost++;
+          } else if (m.homeScore < m.awayScore) {
+            a.won++; a.pts += 3;
+            h.lost++;
+          } else {
+            h.drawn++; h.pts += 1;
+            a.drawn++; a.pts += 1;
+          }
+        }
+      });
+
+      // Sort teams by Points (descending), then Goal Difference
+      const sortedTeams = Object.keys(stats).sort((a, b) => {
+        if (stats[b].pts !== stats[a].pts) return stats[b].pts - stats[a].pts;
+        return stats[b].gd - stats[a].gd;
+      });
+
+      const body = document.getElementById('standingsBody');
+      body.innerHTML = sortedTeams.map(t => {
+        const s = stats[t];
+        return `<tr>
+          <td><strong>${t}</strong></td>
+          <td>${s.played}</td>
+          <td>${s.won}</td>
+          <td>${s.drawn}</td>
+          <td>${s.lost}</td>
+          <td>${s.gd > 0 ? '+' + s.gd : s.gd}</td>
+          <td><strong>${s.pts}</strong></td>
+        </tr>`;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
