@@ -455,6 +455,9 @@
         link.click();
         
         URL.revokeObjectURL(url);
+        
+        // Add a friendly alert to guide the user
+        alert(`✅ Success! Your tournament data has been saved as "${safeName}.json".\n\nYou can usually find this file in your device's default "Downloads" folder. You can move it anywhere you like to keep things organized!`);
     }
 
     function loadTournamentFile(event) {
