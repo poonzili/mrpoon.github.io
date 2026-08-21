@@ -51,7 +51,7 @@
             margin-bottom: 5px;
         }
 
-        input[type="text"], input[type="date"], input[type="number"], select {
+        input[type="text"], input[type="date"], input[type="number"], input[type="file"], select {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid var(--border);
@@ -128,17 +128,6 @@
             font-weight: bold;
         }
 
-        .alert-box {
-            background: #fef3c7;
-            border: 1px solid #fde047;
-            color: #854d0e;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-            font-weight: bold;
-            text-align: center;
-        }
-
         .instruction-box {
             background: #e0f2fe;
             border-left: 4px solid #0284c7;
@@ -180,6 +169,8 @@
             display: flex;
             justify-content: flex-end;
             margin-bottom: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         .team-setup-grid {
@@ -229,11 +220,18 @@
         </div>
         
         <button id="startBtn" class="hidden" style="margin-top: 20px; width: 100%; font-size: 1.1rem; padding: 12px;" onclick="generateTournament()">Generate Fixtures & Start</button>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed var(--border);">
+            <h3>📂 Or Load Existing Data</h3>
+            <p style="font-size: 0.9rem; color: var(--secondary); margin-top: 0;">Continuing a tournament from a previous session? Select your saved .json file here.</p>
+            <input type="file" id="loadFileInput" accept=".json" onchange="loadTournamentFile(event)">
+        </div>
     </div>
 
     <div id="tournamentDisplay" class="hidden">
         <div class="action-bar">
-            <button class="btn-secondary" onclick="location.reload()" style="margin-right: 10px;">Reset App</button>
+            <button class="btn-secondary" onclick="location.reload()">Reset App</button>
+            <button class="btn-primary" onclick="saveTournamentFile()">💾 Save Data</button>
             <button class="btn-success" onclick="exportToImage()">📷 Save Scores as Image</button>
         </div>
 
@@ -406,36 +404,77 @@
                         pairings.push({ teamAId: tournamentData.teams[i].id, teamA: tournamentData.teams[i].name, teamBId: tournamentData.teams[j].id, teamB: tournamentData.teams[j].name, roundLabel: 'League' });
                     }
                 }
-                document.getElementById('standingsCard').classList.remove('hidden');
             } else if (format === 'single_knockout') {
                 let firstLabel = tournamentData.totalRounds === 1 ? 'Grand Final' : 'Round 1';
                 for (let i = 0; i < numTeams; i += 2) {
                     let t1 = tournamentData.teams[i]; let t2 = (i + 1 < numTeams) ? tournamentData.teams[i+1] : { id: 'bye', name: 'BYE', losses: 0 };
                     pairings.push({ teamAId: t1.id, teamA: t1.name, teamBId: t2.id, teamB: t2.name, roundLabel: firstLabel });
                 }
-                document.getElementById('knockoutControls').classList.remove('hidden');
             } else if (format === 'double_knockout') {
                 for (let i = 0; i < numTeams; i += 2) {
                     let t1 = tournamentData.teams[i]; let t2 = (i + 1 < numTeams) ? tournamentData.teams[i+1] : { id: 'bye', name: 'BYE', losses: 0 };
                     pairings.push({ teamAId: t1.id, teamA: t1.name, teamBId: t2.id, teamB: t2.name, roundLabel: 'Round 1 (Upper)' });
                 }
-                document.getElementById('knockoutControls').classList.remove('hidden');
             }
         } else {
             const numMatches = parseInt(document.getElementById('numMatches').value) || 1;
             for (let i = 0; i < numMatches; i++) { pairings.push({ teamAId: null, teamA: `Team A${i+1}`, teamBId: null, teamB: `Team B${i+1}`, roundLabel: '' }); }
-            document.getElementById('knockoutControls').classList.remove('hidden'); 
         }
 
         pairings.forEach((p, idx) => { tournamentData.matches.push(createBaseMatch(idx, p.teamAId, p.teamA, p.teamBId, p.teamB, p.roundLabel)); });
-        document.getElementById('setupCard').classList.add('hidden');
-        document.getElementById('displayTitle').innerText = tournamentData.name;
-        document.getElementById('displayDate').innerText = `Date: ${tournamentData.date} | Format: ${format.replace('_', ' ').toUpperCase()}`;
-        document.getElementById('tournamentDisplay').classList.remove('hidden');
-        renderMatches();
-        if (format === 'roundrobin') updateStandings();
+        
+        transitionToDisplay();
     }
 
+    function transitionToDisplay() {
+        document.getElementById('setupCard').classList.add('hidden');
+        document.getElementById('displayTitle').innerText = tournamentData.name;
+        document.getElementById('displayDate').innerText = `Date: ${tournamentData.date} | Format: ${tournamentData.format.replace('_', ' ').toUpperCase()}`;
+        
+        if (tournamentData.format === 'roundrobin') {
+            document.getElementById('standingsCard').classList.remove('hidden');
+            updateStandings();
+        } else if (tournamentData.format === 'single_knockout' || tournamentData.format === 'double_knockout' || tournamentData.format === 'custom') {
+            document.getElementById('knockoutControls').classList.remove('hidden');
+        }
+
+        document.getElementById('tournamentDisplay').classList.remove('hidden');
+        renderMatches();
+    }
+
+    /* --- DATA SAVE & LOAD LOGIC --- */
+    function saveTournamentFile() {
+        const dataStr = JSON.stringify(tournamentData, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        const safeName = tournamentData.name ? tournamentData.name.replace(/\s+/g, '_') : 'Tournament_Data';
+        link.download = `${safeName}.json`;
+        link.href = url;
+        link.click();
+        
+        URL.revokeObjectURL(url);
+    }
+
+    function loadTournamentFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                tournamentData = JSON.parse(e.target.result);
+                transitionToDisplay();
+            } catch (error) {
+                alert("Error loading file. Please ensure it is a valid tournament JSON file.");
+                event.target.value = ''; // Reset input
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    /* --- AD-HOC MATCH --- */
     function addManualMatch(teamA = 'TBD', teamB = 'TBD', roundLabel = 'Ad-hoc') {
         tournamentData.matches.push(createBaseMatch(tournamentData.matches.length, null, teamA, null, teamB, roundLabel));
         renderMatches();
@@ -458,15 +497,12 @@
         
         const format = tournamentData.format;
 
-        // SINGLE ELIMINATION
         if (format === 'single_knockout') {
             if (match.roundLabel === 'Grand Final' || match.roundLabel === '3rd/4th Place Match') { match.advanced = true; renderMatches(); return; }
-            
             let roundNum = parseInt(match.roundLabel.match(/\d+/)) || 1;
             let totalRounds = tournamentData.totalRounds;
 
             if (roundNum === totalRounds - 1 && totalRounds > 1) {
-                // Semifinals exact match: Winners to Final, Losers to Bronze
                 pushToNextMatch(winnerId, winnerName, 'Grand Final');
                 pushToNextMatch(loserId, loserName, '3rd/4th Place Match');
             } else {
@@ -474,8 +510,6 @@
                 pushToNextMatch(winnerId, winnerName, nextLabel);
             }
         } 
-        
-        // DOUBLE ELIMINATION
         else if (format === 'double_knockout') {
             if (match.roundLabel === 'Grand Final (Bracket Reset)' || (match.roundLabel === 'Grand Final' && winnerTeam && winnerTeam.losses === 0)) { match.advanced = true; renderMatches(); return; } 
             
@@ -488,7 +522,6 @@
             let undefeated = tournamentData.teams.filter(t => (t.losses || 0) === 0);
             let oneLoss = tournamentData.teams.filter(t => (t.losses || 0) === 1);
 
-            // Trigger Grand Final ONLY when exactly 2 eligible teams remain globally
             if (undefeated.length === 1 && oneLoss.length === 1 && !tournamentData.matches.some(m => m.roundLabel === 'Grand Final')) {
                 pushToNextMatch(undefeated[0].id, undefeated[0].name, 'Grand Final');
                 pushToNextMatch(oneLoss[0].id, oneLoss[0].name, 'Grand Final');
@@ -670,18 +703,12 @@
         const batters = teamKey === 'A' ? tournamentData.matches[matchIdx].battersA : tournamentData.matches[matchIdx].battersB;
         return batters.map((b, bIdx) => {
             const basesHtml = b.bases.map((state, baseIdx) => {
-                let cls = 'base-box'; 
-                let label = 'B' + (baseIdx + 1); 
+                let cls = 'base-box'; let label = 'B' + (baseIdx + 1); 
                 if (state === 1) { cls += ' reached'; label = '✓'; } 
                 if (state === 2) { cls += ' out'; label = 'X'; } 
                 return `<div class="${cls}" onclick="toggleBase(${matchIdx}, '${teamKey}', ${bIdx}, ${baseIdx})">${label}</div>`;
             }).join('');
-            
-            return `
-            <div style="margin-bottom:8px; background:#f8fafc; padding:5px; border-radius:4px;">
-                <input type="text" value="${b.name}" style="margin-bottom:4px;" onchange="updateBatterName(${matchIdx}, '${teamKey}', ${bIdx}, this.value)">
-                <div class="base-grid">${basesHtml}</div>
-            </div>`;
+            return `<div style="margin-bottom:8px; background:#f8fafc; padding:5px; border-radius:4px;"><input type="text" value="${b.name}" style="margin-bottom:4px;" onchange="updateBatterName(${matchIdx}, '${teamKey}', ${bIdx}, this.value)"><div class="base-grid">${basesHtml}</div></div>`;
         }).join('');
     }
 
