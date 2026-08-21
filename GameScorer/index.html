@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Sport Tournament Scorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        h1, h2, h3 { margin-top: 0; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"], input[type="date"], input[type="number"], select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input { width: auto; }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:hover { background: var(--primary-dark); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-warning { background: var(--warning); color: #000; }
+        button.btn-success { background: var(--success); }
+        button.btn-sm { padding: 4px 8px; font-size: 0.85rem; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px;
+            text-align: center;
+        }
+
+        th { background: #f1f5f9; }
+
+        .score-btn-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .match-card {
+            border-left: 4px solid var(--primary);
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .alert-box {
+            background: #fef3c7;
+            border: 1px solid #fde047;
+            color: #854d0e;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .instruction-box {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            color: #0369a1;
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .instruction-box ul {
+            margin: 5px 0 0 20px;
+            padding: 0;
+        }
+
+        .base-grid {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 5px 0;
+        }
+
+        .base-box {
+            width: 45px;
+            height: 45px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            background: #fff;
+        }
+
+        .base-box.reached { background: var(--success); color: white; border-color: var(--success); }
+        .base-box.out { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .action-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>Tournament Setup</h2>
+        <div class="form-group">
+            <label>Tournament Name</label>
+            <input type="text" id="tournamentName" placeholder="e.g., Summer Championship">
+        </div>
+        <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="tournamentDate">
+        </div>
+        <div class="form-group">
+            <label>Game Category</label>
+            <select id="gameCategory" onchange="renderSetupOptions()">
+                <option value="">-- Select Category --</option>
+                <option value="invasion">Territorial / Invasion (e.g., Football, Basketball)</option>
+                <option value="net">Net / Barrier (e.g., Badminton, Volleyball, Tennis)</option>
+                <option value="striking">Striking / Fielding (e.g., Baseball, Softball, Cricket)</option>
+            </select>
+        </div>
+
+        <div id="instructionsContainer"></div>
+        <div id="dynamicSetup"></div>
+        
+        <button id="startBtn" class="hidden" onclick="generateTournament()">Start Tournament</button>
+    </div>
+
+    <div id="tournamentDisplay" class="hidden">
+        <div class="action-bar">
+            <button class="btn-success" onclick="exportToImage()">📷 Save Scores as Image</button>
+        </div>
+
+        <div id="captureArea" style="padding: 10px; background: var(--bg);">
+            <div class="card">
+                <h2 id="displayTitle"></h2>
+                <p id="displayDate" style="color: #64748b;"></p>
+            </div>
+
+            <div class="card hidden" id="standingsCard">
+                <h3>Overall Standings</h3>
+                <small style="color: #64748b; display: block; margin-bottom: 10px;">💡 Tip: You can edit team names directly in the table below to automatically update all fixture names.</small>
+                <div id="standingsTableContainer"></div>
+            </div>
+
+            <div class="card">
+                <h3>Matches</h3>
+                <div id="matchesContainer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let tournamentData = {
+        name: '',
+        date: '',
+        category: '',
+        format: 'custom',
+        config: {},
+        matches: [],
+        teams: []
+    };
+
+    const categoryInstructions = {
+        invasion: `
+            <div class="instruction-box">
+                <strong>Territorial / Invasion Games Instructions:</strong>
+                <ul>
+                    <li>Use the <strong>+</strong> and <strong>-</strong> buttons to adjust goals or points during real-time gameplay.</li>
+                    <li>Wins grant 3 points in Standings; Draws grant 1 point; Losses grant 0 points.</li>
+                    <li>Team names can be edited directly in match boxes or in the Standings table.</li>
+                </ul>
+            </div>
+        `,
+        net: `
+            <div class="instruction-box">
+                <strong>Net / Barrier Games Instructions:</strong>
+                <ul>
+                    <li>The scoreboard displays <strong>all sets</strong>. You can adjust scores for any set historically.</li>
+                    <li>The system will automatically calculate "Sets Won" based on your max points and win-by-2 rules.</li>
+                    <li>Interval/Court change alerts will automatically prompt when a team reaches the midpoint (e.g., 11 in a 21-point game) of the currently active set.</li>
+                </ul>
+            </div>
+        `,
+        striking: `
+            <div class="instruction-box">
+                <strong>Striking / Fielding Games Instructions:</strong>
+                <ul>
+                    <li>Enter player names in the batting lineup for each team.</li>
+                    <li>Click bases (B1, B2, B3, B4): <strong>Gray</strong> = Unreached, <strong>Green (✓)</strong> = Safe (+1 point), <strong>Red (X)</strong> = Out.</li>
+                    <li>Innings switch automatically after 3 outs or when all batters in the lineup complete their turn.</li>
+                </ul>
+            </div>
+        `
+    };
+
+    function renderSetupOptions() {
+        const cat = document.getElementById('gameCategory').value;
+        const container = document.getElementById('dynamicSetup');
+        const instructionsContainer = document.getElementById('instructionsContainer');
+        const startBtn = document.getElementById('startBtn');
+        
+        container.innerHTML = '';
+        instructionsContainer.innerHTML = '';
+
+        if (!cat) {
+            startBtn.classList.add('hidden');
+            return;
+        }
+
+        instructionsContainer.innerHTML = categoryInstructions[cat] || '';
+        startBtn.classList.remove('hidden');
+
+        let html = `
+            <div class="form-group">
+                <label>Tournament Format</label>
+                <select id="tournamentFormat" onchange="toggleFormatInputs()">
+                    <option value="custom">Custom Match Count</option>
+                    <option value="roundrobin">Round Robin</option>
+                </select>
+            </div>
+            <div id="matchCountGroup" class="form-group">
+                <label>Number of Matches</label>
+                <input type="number" id="numMatches" min="1" value="1">
+            </div>
+            <div id="teamCountGroup" class="form-group hidden">
+                <label>Number of Teams</label>
+                <input type="number" id="numTeams" min="2" value="4">
+            </div>
+        `;
+
+        if (cat === 'net') {
+            html += `
+                <div class="form-group"><label>Number of Sets per Match</label><input type="number" id="numSets" min="1" value="3"></div>
+                <div class="form-group"><label>Max Points per Set</label><input type="number" id="maxPoints" min="1" value="21"></div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="winByTwo" checked>
+                    <label for="winByTwo" style="margin:0;">Must Win by 2 Points</label>
+                </div>
+            `;
+        } else if (cat === 'striking') {
+            html += `
+                <div class="form-group"><label>Number of Batters per Team</label><input type="number" id="numBatters" min="1" value="9"></div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function toggleFormatInputs() {
+        const format = document.getElementById('tournamentFormat').value;
+        const matchGroup = document.getElementById('matchCountGroup');
+        const teamGroup = document.getElementById('teamCountGroup');
+
+        if (format === 'roundrobin') {
+            matchGroup.classList.add('hidden');
+            teamGroup.classList.remove('hidden');
+        } else {
+            matchGroup.classList.remove('hidden');
+            teamGroup.classList.add('hidden');
+        }
+    }
+
+    function generateTournament() {
+        const name = document.getElementById('tournamentName').value || 'Tournament';
+        const date = document.getElementById('tournamentDate').value || new Date().toISOString().split('T')[0];
+        const cat = document.getElementById('gameCategory').value;
+        const format = document.getElementById('tournamentFormat').value;
+
+        tournamentData.name = name;
+        tournamentData.date = date;
+        tournamentData.category = cat;
+        tournamentData.format = format;
+        tournamentData.matches = [];
+        tournamentData.teams = [];
+
+        if (cat === 'net') {
+            tournamentData.config = {
+                numSets: parseInt(document.getElementById('numSets').value) || 3,
+                maxPoints: parseInt(document.getElementById('maxPoints').value) || 21,
+                winByTwo: document.getElementById('winByTwo').checked
+            };
+        } else if (cat === 'striking') {
+            tournamentData.config = {
+                numBatters: parseInt(document.getElementById('numBatters').value) || 9
+            };
+        }
+
+        let pairings = [];
+
+        if (format === 'roundrobin') {
+            const numTeams = parseInt(document.getElementById('numTeams').value) || 2;
+            for (let i = 1; i <= numTeams; i++) {
+                tournamentData.teams.push({ id: `team_${i}`, name: `Team ${i}` });
+            }
+            for (let i = 0; i < numTeams; i++) {
+                for (let j = i + 1; j < numTeams; j++) {
+                    pairings.push({ 
+                        teamAId: tournamentData.teams[i].id, 
+                        teamA: tournamentData.teams[i].name, 
+                        teamBId: tournamentData.teams[j].id, 
+                        teamB: tournamentData.teams[j].name 
+                    });
+                }
+            }
+            document.getElementById('standingsCard').classList.remove('hidden');
+        } else {
+            const numMatches = parseInt(document.getElementById('numMatches').value) || 1;
+            for (let i = 0; i < numMatches; i++) {
+                pairings.push({ teamAId: null, teamA: `Team A${i+1}`, teamBId: null, teamB: `Team B${i+1}` });
+            }
+            document.getElementById('standingsCard').classList.add('hidden');
+        }
+
+        pairings.forEach((p, idx) => {
+            let match = {
+                id: idx,
+                teamAId: p.teamAId,
+                teamA: p.teamA,
+                teamBId: p.teamBId,
+                teamB: p.teamB,
+                scoreA: 0,
+                scoreB: 0,
+                completed: false
+            };
+
+            if (cat === 'net') {
+                match.setsA = 0;
+                match.setsB = 0;
+                match.currentSet = 1;
+                match.setScores = Array.from({length: tournamentData.config.numSets}, () => ({a: 0, b: 0}));
+            } else if (cat === 'striking') {
+                const count = tournamentData.config.numBatters;
+                match.battersA = Array.from({length: count}, (_, k) => ({ name: `Batter ${k+1}`, bases: [0,0,0,0] })); 
+                match.battersB = Array.from({length: count}, (_, k) => ({ name: `Batter ${k+1}`, bases: [0,0,0,0] }));
+                match.outsA = 0;
+                match.outsB = 0;
+                match.currentInning = 'A';
+            }
+
+            tournamentData.matches.push(match);
+        });
+
+        document.getElementById('displayTitle').innerText = tournamentData.name;
+        document.getElementById('displayDate').innerText = `Date: ${tournamentData.date} | Category: ${cat.toUpperCase()} (${format.toUpperCase()})`;
+        document.getElementById('tournamentDisplay').classList.remove('hidden');
+
+        renderMatches();
+        if (format === 'roundrobin') {
+            updateStandings();
+        }
+    }
+
+    function updateTeamNameFromMatch(matchId, teamKey, value) {
+        const match = tournamentData.matches[matchId];
+        const newName = value || (teamKey === 'teamA' ? 'Team A' : 'Team B');
+        match[teamKey] = newName;
+
+        if (tournamentData.format === 'roundrobin') {
+            const teamId = teamKey === 'teamA' ? match.teamAId : match.teamBId;
+            const teamObj = tournamentData.teams.find(t => t.id === teamId);
+            if (teamObj) {
+                teamObj.name = newName;
+                syncTeamNamesFromMasterList();
+            }
+            updateStandings();
+        }
+    }
+
+    function updateTeamNameFromStandings(teamId, newName) {
+        const val = newName || 'Team';
+        const teamObj = tournamentData.teams.find(t => t.id === teamId);
+        if (teamObj) {
+            teamObj.name = val;
+            syncTeamNamesFromMasterList();
+            renderMatches();
+            updateStandings();
+        }
+    }
+
+    function syncTeamNamesFromMasterList() {
+        tournamentData.matches.forEach(m => {
+            const teamAObj = tournamentData.teams.find(t => t.id === m.teamAId);
+            const teamBObj = tournamentData.teams.find(t => t.id === m.teamBId);
+            if (teamAObj) m.teamA = teamAObj.name;
+            if (teamBObj) m.teamB = teamBObj.name;
+        });
+    }
+
+    /* --- INVASION LOGIC --- */
+    function adjustInvasionScore(matchId, teamKey, delta) {
+        const match = tournamentData.matches[matchId];
+        if (teamKey === 'A') {
+            match.scoreA = Math.max(0, match.scoreA + delta);
+        } else {
+            match.scoreB = Math.max(0, match.scoreB + delta);
+        }
+        document.getElementById(`score-A-${matchId}`).innerText = match.scoreA;
+        document.getElementById(`score-B-${matchId}`).innerText = match.scoreB;
+        if (tournamentData.format === 'roundrobin') {
+            updateStandings();
+        }
+    }
+
+    /* --- NET LOGIC --- */
+    function adjustNetScore(matchId, teamKey, delta, setIndex) {
+        const match = tournamentData.matches[matchId];
+        const cfg = tournamentData.config;
+        const setScore = match.setScores[setIndex];
+
+        // Apply score change
+        if (teamKey === 'A') setScore.a = Math.max(0, setScore.a + delta);
+        if (teamKey === 'B') setScore.b = Math.max(0, setScore.b + delta);
+
+        // Recalculate everything globally
+        let setsA = 0;
+        let setsB = 0;
+        const target = cfg.maxPoints;
+
+        // Tally Sets Won
+        match.setScores.forEach((score) => {
+            const a = score.a;
+            const b = score.b;
+            let setWonBy = null;
+
+            if (cfg.winByTwo) {
+                if (a >= target && (a - b) >= 2) setWonBy = 'A';
+                else if (b >= target && (b - a) >= 2) setWonBy = 'B';
+            } else {
+                if (a >= target && a > b) setWonBy = 'A';
+                else if (b >= target && b > a) setWonBy = 'B';
+            }
+
+            if (setWonBy === 'A') setsA++;
+            if (setWonBy === 'B') setsB++;
+        });
+
+        match.setsA = setsA;
+        match.setsB = setsB;
+        match.scoreA = setsA; 
+        match.scoreB = setsB;
+
+        // Auto-advance Current Set
+        let newCurrentSet = 1;
+        for (let i = 0; i < cfg.numSets; i++) {
+            const a = match.setScores[i].a;
+            const b = match.setScores[i].b;
+            let hasWinner = false;
+            
+            if (cfg.winByTwo) {
+                if (a >= target && (a - b) >= 2) hasWinner = true;
+                if (b >= target && (b - a) >= 2) hasWinner = true;
+            } else {
+                if (a >= target && a > b) hasWinner = true;
+                if (b >= target && b > a) hasWinner = true;
+            }
+            
+            if (hasWinner) newCurrentSet = i + 2;
+            else {
+                newCurrentSet = i + 1;
+                break;
+            }
+        }
+
+        const requiredWins = Math.ceil(cfg.numSets / 2);
+        if (newCurrentSet > cfg.numSets || setsA >= requiredWins || setsB >= requiredWins) {
+            match.completed = true;
+            match.currentSet = Math.min(newCurrentSet, cfg.numSets); 
+        } else {
+            match.completed = false;
+            match.currentSet = newCurrentSet;
+        }
+
+        renderMatches();
+        if (tournamentData.format === 'roundrobin') {
+            updateStandings();
+        }
+    }
+
+    /* --- STRIKING / FIELDING LOGIC --- */
+    function updateBatterName(matchId, teamKey, index, name) {
+        const match = tournamentData.matches[matchId];
+        const list = teamKey === 'A' ? match.battersA : match.battersB;
+        list[index].name = name;
+    }
+
+    function toggleBase(matchId, teamKey, batterIdx, baseIdx) {
+        const match = tournamentData.matches[matchId];
+        if (teamKey !== match.currentInning) return;
+
+        const batters = teamKey === 'A' ? match.battersA : match.battersB;
+        const batter = batters[batterIdx];
+
+        batter.bases[baseIdx] = (batter.bases[baseIdx] + 1) % 3;
+
+        recalcStrikingMatch(matchId);
+        renderMatches();
+        if (tournamentData.format === 'roundrobin') {
+            updateStandings();
+        }
+    }
+
+    function recalcStrikingMatch(matchId) {
+        const match = tournamentData.matches[matchId];
+        
+        ['A', 'B'].forEach(teamKey => {
+            const batters = teamKey === 'A' ? match.battersA : match.battersB;
+            let totalPoints = 0;
+            let totalOuts = 0;
+
+            batters.forEach(b => {
+                b.bases.forEach(state => {
+                    if (state === 1) totalPoints += 1;
+                    if (state === 2) totalOuts += 1;
+                });
+            });
+
+            if (teamKey === 'A') {
+                match.scoreA = totalPoints;
+                match.outsA = totalOuts;
+            } else {
+                match.scoreB = totalPoints;
+                match.outsB = totalOuts;
+            }
+        });
+
+        const currentOuts = match.currentInning === 'A' ? match.outsA : match.outsB;
+        const currentBatters = match.currentInning === 'A' ? match.battersA : match.battersB;
+        const allBatted = currentBatters.every(b => b.bases.some(state => state !== 0));
+
+        if (currentOuts >= 3 || allBatted) {
+            if (match.currentInning === 'A') {
+                match.currentInning = 'B';
+            } else {
+                match.completed = true;
+            }
+        }
+    }
+
+    /* --- RENDER FUNCTIONS --- */
+    function renderMatches() {
+        const container = document.getElementById('matchesContainer');
+        container.innerHTML = '';
+
+        tournamentData.matches.forEach((m, idx) => {
+            const card = document.createElement('div');
+            card.className = 'match-card';
+
+            let bodyHtml = '';
+
+            if (tournamentData.category === 'invasion') {
+                bodyHtml = `
+                    <div style="display:flex; justify-content:space-around; align-items:center;">
+                        <div>
+                            <input type="text" value="${m.teamA}" onchange="updateTeamNameFromMatch(${idx}, 'teamA', this.value)">
+                            <div class="score-btn-group" style="margin-top:10px;">
+                                <button class="btn-sm" onclick="adjustInvasionScore(${idx}, 'A', -1)">-</button>
+                                <span id="score-A-${idx}" style="font-size:1.5rem; font-weight:bold;">${m.scoreA}</span>
+                                <button class="btn-sm" onclick="adjustInvasionScore(${idx}, 'A', 1)">+</button>
+                            </div>
+                        </div>
+                        <h3>VS</h3>
+                        <div>
+                            <input type="text" value="${m.teamB}" onchange="updateTeamNameFromMatch(${idx}, 'teamB', this.value)">
+                            <div class="score-btn-group" style="margin-top:10px;">
+                                <button class="btn-sm" onclick="adjustInvasionScore(${idx}, 'B', -1)">-</button>
+                                <span id="score-B-${idx}" style="font-size:1.5rem; font-weight:bold;">${m.scoreB}</span>
+                                <button class="btn-sm" onclick="adjustInvasionScore(${idx}, 'B', 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (tournamentData.category === 'net') {
+                
+                let setsHtml = m.setScores.map((score, sIdx) => {
+                    let isCurrent = (m.currentSet === sIdx + 1);
+                    let bgColor = isCurrent ? '#e2e8f0' : '#f8fafc';
+                    let borderHighlight = isCurrent ? 'border-left: 4px solid var(--primary);' : 'border-left: 1px solid var(--border);';
+                    
+                    return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; background:${bgColor}; padding:8px 10px; border-radius:4px; margin-bottom:6px; border:1px solid var(--border); ${borderHighlight}">
+                            <div style="flex:1; text-align:right; padding-right:15px;">
+                                <div class="score-btn-group">
+                                    <button class="btn-sm" onclick="adjustNetScore(${idx}, 'A', -1, ${sIdx})">-</button>
+                                    <span style="font-size:1.2rem; font-weight:bold; min-width:30px; display:inline-block; text-align:center;">${score.a}</span>
+                                    <button class="btn-sm" onclick="adjustNetScore(${idx}, 'A', 1, ${sIdx})">+</button>
+                                </div>
+                            </div>
+                            <div style="flex:0 0 60px; text-align:center; font-weight:700; font-size:0.9rem; color:#475569;">
+                                SET ${sIdx + 1}
+                            </div>
+                            <div style="flex:1; text-align:left; padding-left:15px;">
+                                <div class="score-btn-group">
+                                    <button class="btn-sm" onclick="adjustNetScore(${idx}, 'B', -1, ${sIdx})">-</button>
+                                    <span style="font-size:1.2rem; font-weight:bold; min-width:30px; display:inline-block; text-align:center;">${score.b}</span>
+                                    <button class="btn-sm" onclick="adjustNetScore(${idx}, 'B', 1, ${sIdx})">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Determine if we need to show the interval alert for the current set
+                let alertHtml = '';
+                if (!m.completed) {
+                    const activeSetScore = m.setScores[m.currentSet - 1];
+                    const intervalPoint = Math.ceil(tournamentData.config.maxPoints / 2);
+                    
+                    // Shows ONLY when the leading team is EXACTLY at the interval point
+                    if (activeSetScore && Math.max(activeSetScore.a, activeSetScore.b) === intervalPoint) {
+                        alertHtml = `<div class="alert-box">⏱️ Interval / Court Change Reminder! A team reached ${intervalPoint} points in Set ${m.currentSet}.</div>`;
+                    }
+                }
+
+                bodyHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div style="width:40%;">
+                            <input type="text" value="${m.teamA}" onchange="updateTeamNameFromMatch(${idx}, 'teamA', this.value)" style="font-weight:bold; text-align:right;">
+                        </div>
+                        <span style="font-weight:bold; color:#64748b; margin:0 10px;">VS</span>
+                        <div style="width:40%;">
+                            <input type="text" value="${m.teamB}" onchange="updateTeamNameFromMatch(${idx}, 'teamB', this.value)" style="font-weight:bold;">
+                        </div>
+                    </div>
+                    
+                    <p style="text-align:center; margin: 0 0 15px 0; font-size:1.1rem;">
+                        <strong>Match Score (Sets):</strong> ${m.setsA} - ${m.setsB}
+                    </p>
+                    
+                    ${alertHtml}
+                    
+                    <div style="background:#f1f5f9; padding:10px; border-radius:6px;">
+                        ${setsHtml}
+                    </div>
+                `;
+            } else if (tournamentData.category === 'striking') {
+                bodyHtml = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <input type="text" value="${m.teamA}" onchange="updateTeamNameFromMatch(${idx}, 'teamA', this.value)" style="width:40%;">
+                        <input type="text" value="${m.teamB}" onchange="updateTeamNameFromMatch(${idx}, 'teamB', this.value)" style="width:40%;">
+                    </div>
+                    <p><strong>Active Inning:</strong> ${m.currentInning === 'A' ? m.teamA : m.teamB} Batting | <strong>Outs:</strong> ${m.currentInning === 'A' ? m.outsA : m.outsB}/3 | <em>Tap Box: Gray=None, Green=Safe (+1pt), Red=Out</em></p>
+                    <div style="display:flex; gap:20px;">
+                        <div style="flex:1;">
+                            <h4>${m.teamA} Batting Lineup (Pts: ${m.scoreA})</h4>
+                            ${renderBattingList(idx, 'A')}
+                        </div>
+                        <div style="flex:1;">
+                            <h4>${m.teamB} Batting Lineup (Pts: ${m.scoreB})</h4>
+                            ${renderBattingList(idx, 'B')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            card.innerHTML = `<h4>Match ${idx + 1}</h4>` + bodyHtml;
+            container.appendChild(card);
+        });
+    }
+
+    function renderBattingList(matchIdx, teamKey) {
+        const match = tournamentData.matches[matchIdx];
+        const batters = teamKey === 'A' ? match.battersA : match.battersB;
+        
+        return batters.map((b, bIdx) => `
+            <div style="margin-bottom:8px; background:#f8fafc; padding:5px; border-radius:4px;">
+                <input type="text" value="${b.name}" style="margin-bottom:4px;" onchange="updateBatterName(${matchIdx}, '${teamKey}', ${bIdx}, this.value)">
+                <div class="base-grid">
+                    ${b.bases.map((state, baseIdx) => {
+                        let cls = 'base-box';
+                        let label = `B${baseIdx+1}`;
+                        if (state === 1) { cls += ' reached'; label = '✓'; }
+                        if (state === 2) { cls += ' out'; label = 'X'; }
+                        return `<div class="${cls}" onclick="toggleBase(${matchIdx}, '${teamKey}', ${bIdx}, ${baseIdx})">${label}</div>`;
+                    }).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    /* --- STANDINGS TABULATION --- */
+    function updateStandings() {
+        const stats = {};
+
+        tournamentData.teams.forEach(t => {
+            stats[t.id] = { id: t.id, name: t.name, played: 0, wins: 0, losses: 0, draws: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+        });
+
+        tournamentData.matches.forEach(m => {
+            const tA = stats[m.teamAId];
+            const tB = stats[m.teamBId];
+
+            if (!tA || !tB) return;
+
+            const scoreA = m.scoreA;
+            const scoreB = m.scoreB;
+
+            tA.gf += scoreA;
+            tA.ga += scoreB;
+            tB.gf += scoreB;
+            tB.ga += scoreA;
+
+            if (scoreA > 0 || scoreB > 0 || m.completed) {
+                if (scoreA > scoreB) {
+                    tA.wins++;
+                    tB.losses++;
+                    tA.pts += 3;
+                } else if (scoreB > scoreA) {
+                    tB.wins++;
+                    tA.losses++;
+                    tB.pts += 3;
+                } else {
+                    tA.draws++;
+                    tB.draws++;
+                    tA.pts += 1;
+                    tB.pts += 1;
+                }
+            }
+        });
+
+        Object.values(stats).forEach(t => t.gd = t.gf - t.ga);
+
+        const container = document.getElementById('standingsTableContainer');
+        const sorted = Object.values(stats).sort((a,b) => b.pts - a.pts || b.gd - a.gd);
+
+        let tableHtml = `
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Team Name</th>
+                        <th>Wins</th>
+                        <th>Losses</th>
+                        <th>Draws</th>
+                        <th>${tournamentData.category === 'striking' ? 'Runs For' : 'GF (Sets)'}</th>
+                        <th>${tournamentData.category === 'striking' ? 'Runs Agst' : 'GA (Sets)'}</th>
+                        <th>Diff</th>
+                        <th>Points</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sorted.map(t => `
+                        <tr>
+                            <td style="text-align:left;">
+                                <input type="text" value="${t.name}" onchange="updateTeamNameFromStandings('${t.id}', this.value)" style="font-weight:600; border:1px solid #cbd5e1; padding:4px 8px;">
+                            </td>
+                            <td>${t.wins}</td>
+                            <td>${t.losses}</td>
+                            <td>${t.draws}</td>
+                            <td>${t.gf}</td>
+                            <td>${t.ga}</td>
+                            <td>${t.gd > 0 ? '+' + t.gd : t.gd}</td>
+                            <td><strong>${t.pts}</strong></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        container.innerHTML = tableHtml;
+    }
+
+    /* --- IMAGE EXPORT --- */
+    function exportToImage() {
+        const area = document.getElementById('captureArea');
+        
+        html2canvas(area, {
+            scale: 2,
+            useCORS: true
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `${tournamentData.name.replace(/\s+/g, '_')}_Scores.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+</script>
+</body>
+</html>
