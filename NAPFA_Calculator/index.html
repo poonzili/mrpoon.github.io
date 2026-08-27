@@ -1,1 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPFA Award Calculator (Ages 12-24)</title>
+    <style>
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f9f4ff; 
+    }
+    h1 {
+        color: #5d3a9b; 
+        text-align: center;
+    }
+    .calculator {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(93, 58, 155, 0.1); 
+        border: 1px solid #e0d0ff; 
+    }
+    .profile-section {
+        background-color: #f3ebff;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #d3c0e5;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #5d3a9b; 
+    }
+    input, select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #d3c0e5; 
+        border-radius: 4px;
+        box-sizing: border-box;
+        background-color: #fdfaff; 
+    }
+    button {
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        width: 100%;
+        transition: background-color 0.3s;
+    }
+    .btn-profile {
+        background-color: #5d3a9b;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    .btn-profile:hover {
+        background-color: #432475;
+    }
+    .btn-calc {
+        background-color: #7e5aa8; 
+        margin-top: 15px;
+    }
+    .btn-calc:hover {
+        background-color: #5d3a9b; 
+    }
+    .standards-preview {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #FAF5FF;
+        border: 1px dashed #bba1e0;
+        border-radius: 6px;
+    }
+    .standards-preview h3 {
+        margin-top: 0;
+        color: #5d3a9b;
+        font-size: 16px;
+        border-bottom: 1px solid #e0d0ff;
+        padding-bottom: 5px;
+    }
+    .score-entry-area {
+        border-top: 2px dashed #e0d0ff;
+        padding-top: 15px;
+        margin-top: 20px;
+    }
+    .result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 4px;
+        display: none;
+        background-color: #f5f0ff; 
+        border-left: 4px solid #7e5aa8; 
+    }
+    .gold { background-color: #e6d7ff; border: 1px solid #c9a8ff; color: #5d3a9b; font-weight: bold; padding: 2px 6px; border-radius:3px; }
+    .silver { background-color: #e0e0e0; border: 1px solid #bdbdbd; color: #424242; font-weight: bold; padding: 2px 6px; border-radius:3px; }
+    .bronze { background-color: #d7ccc8; border: 1px solid #bcaaa4; color: #5d3a9b; font-weight: bold; padding: 2px 6px; border-radius:3px; }
+    .no-award { background-color: #efebe9; border: 1px solid #d7ccc8; color: #5d3a9b; font-weight: bold; padding: 2px 6px; border-radius:3px; }
+    
+    .improvement {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #f5f0ff; 
+        border-radius: 4px;
+        border-left: 4px solid #7e5aa8; 
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    th {
+        background-color: #e6d7ff; 
+        color: #5d3a9b; 
+    }
+    th, td {
+        border: 1px solid #d3c0e5; 
+        padding: 8px;
+        text-align: left;
+    }
+    tr:nth-child(even) {
+        background-color: #f9f4ff; 
+    }
+    .improvement-list {
+        margin-top: 10px;
+        padding-left: 0;
+        list-style: none;
+    }
+    .improvement-item {
+        margin-bottom: 20px;
+        background: #ffffff;
+        border: 1px solid #d3c0e5;
+        border-radius: 6px;
+        padding: 12px;
+    }
+    .preview-table th, .preview-table td {
+        font-size: 13px;
+    }
+    .preview-table th {
+        background-color: #ede2ff;
+    }
+    
+    /* Visual Training Cards Styling */
+    .training-card {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        background-color: #faf6ff;
+        border: 1px solid #e0d0ff;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+    }
+    .training-svg-container {
+        flex-shrink: 0;
+        width: 90px;
+        height: 90px;
+        background-color: #e6d7ff;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .training-svg-container svg {
+        width: 55px;
+        height: 55px;
+        fill: #5d3a9b;
+    }
+    .training-info {
+        flex-grow: 1;
+        font-size: 13px;
+        color: #333;
+    }
+    .training-info strong {
+        color: #5d3a9b;
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+    }
+    .training-info ul {
+        margin: 4px 0 0 18px;
+        padding: 0;
+    }
+    details summary {
+        cursor: pointer;
+        color: #5d3a9b;
+        font-weight: bold;
+        margin-top: 8px;
+    }
+    @media (max-width: 600px) {
+        .training-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+</head>
+<body>
+    <h1>NAPFA Award Calculator</h1>
+    <div class="calculator">
+        
+        <!-- Step 1: Profile Selection Dropdowns -->
+        <div class="profile-section">
+            <div class="form-group">
+                <label for="age">Age Selection (12 to 24):</label>
+                <select id="age" required>
+                    <option value="">-- Select Age --</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20-24">20 to 24</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="gender">Gender:</label>
+                <select id="gender" required>
+                    <option value="">-- Select Gender --</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                </select>
+            </div>
+            <button type="button" class="btn-profile" onclick="confirmProfile()">Confirm Profile</button>
+        </div>
 
+        <!-- Dynamic Performance Target Preview Grid Box -->
+        <div id="standards-preview-box" class="standards-preview" style="display: none;"></div>
+
+        <!-- Step 2: Scoring Inputs Area -->
+        <div id="score-inputs-section" class="score-entry-area" style="display: none;">
+            <div class="form-group">
+                <label for="sit-ups">Number of Sit-ups in 1 min:</label>
+                <input type="number" id="sit-ups" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="broad-jump">Standing Broad Jump (cm):</label>
+                <input type="number" id="broad-jump" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="sit-reach">Sit & Reach Distance (cm):</label>
+                <input type="number" id="sit-reach" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="pull-ups" id="pull-ups-label">Pull-ups Variant:</label>
+                <input type="number" id="pull-ups" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="shuttle-run">4 x 10m Shuttle Run Time (sec):</label>
+                <input type="number" id="shuttle-run" min="0" step="0.1" required>
+            </div>
+            <div class="form-group">
+                <label for="run-walk">2.4 km Run-Walk Time (min:sec):</label>
+                <input type="text" id="run-walk" placeholder="e.g. 14:15" required>
+            </div>
+            <button class="btn-calc" onclick="calculateAward()">Calculate Award</button>
+        </div>
+        
+        <div id="result" class="result"></div>
+        <div id="improvement" class="improvement" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Offline Vector Diagrams and Step-by-Step Training Data
+        const trainingGuideMap = {
+            'Sit-ups': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M20.5 19l-4.2-6.3c-.3-.5-.9-.8-1.5-.7l-3.8.6 1.8-3.6c.4-.7.1-1.6-.6-2-.7-.4-1.6-.1-2 .6l-3.5 7c-.3.5-.2 1.2.2 1.6l4.2 4.2c.4.4.9.6 1.4.6h8c.8 0 1.5-.7 1.5-1.5s-.6-1.4-1.5-1.5zM6 7c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>`,
+                title: "Core Endurance Workout Plan",
+                drills: ["Planks: 3 x 45-second holds", "Bicycle Crunches: 3 x 20 reps", "Timed 30-sec Sit-up Sprints"]
+            },
+            'Standing Broad Jump': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 7.5l-3.2-1.6-1.8 3.6 2.5 3.5c.3.4.3 1 0 1.4-.2.2-.5.4-.8.4h-5c-.4 0-.8-.2-1-.6l-2-3-3.2 2.1c-.4.3-.9.3-1.3 0l-3-2c-.5-.3-.6-1-.3-1.5.3-.5 1-.6 1.5-.3l2.3 1.5 3.9-2.6-1.5-3c-.2-.4-.2-.9 0-1.3l2-3.5c.4-.7 1.3-1 2-0.6l4 2.3c.7.4 1.1 1.2 0.9 2l-.7 2.2 2.7 1.3c.6.3.9 1 .6 1.6-.2.4-.6.7-1.1.7z"/></svg>`,
+                title: "Lower-Body Explosive Power",
+                drills: ["Box Jumps / Tuck Jumps: 3 x 8 reps", "Bodyweight Squat Jumps: 3 x 10 reps", "Kettlebell/Dumbbell Swings: 3 x 12 reps"]
+            },
+            'Sit & Reach': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M4.5 10.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm16.2 6.3l-5-2-3.7-5.5c-.4-.6-1.1-1-1.9-1h-3.1c-.8 0-1.5.4-1.9 1l-3 4.5c-.4.6-.3 1.4.3 1.8.6.4 1.4.3 1.8-.3l2.4-3.6h1.7l3 4.5c.3.5.9.8 1.5.8h7c.8 0 1.5-.7 1.5-1.5s-.3-.6-.6-.7z"/></svg>`,
+                title: "Hamstring & Back Flexibility Routine",
+                drills: ["Seated Single-Leg Hamstring Stretch: 30s per leg", "Standing Forward Fold: 3 x 30 seconds", "Hip Hinge Dynamic Stretches"]
+            },
+            'Inclined Pull-ups': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M20 3H4c-.6 0-1 .4-1 1s.4 1 1 1h16c.6 0 1-.4 1-1s-.4-1-1-1zm-6 6c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm3.5 11.5l-3.5-5-2.5 1.5v4c0 .8-.7 1.5-1.5 1.5s-1.5-.7-1.5-1.5v-5c0-.5.3-1 .7-1.3l3.8-2.3c.4-.2.8-.3 1.3-.2l3.2.6c.7.1 1.3.7 1.3 1.4v4.8c0 .8-.7 1.5-1.5 1.5s-1.3-.7-1.3-1.5z"/></svg>`,
+                title: "Upper Body Pulling Progression (Inclined)",
+                drills: ["Inverted Rows (TRX / Low Bar): 3 x 10 reps", "Scapular Retraction Holds: 3 x 15 seconds", "Resistance Band Lat Pulldowns"]
+            },
+            'Full Pull-ups': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M20 3H4c-.6 0-1 .4-1 1s.4 1 1 1h16c.6 0 1-.4 1-1s-.4-1-1-1zm-8 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm3 14v-5.5l1.8-1.8c.4-.4.5-1 .3-1.5l-1.1-3.2c-.3-.8-1-1.4-1.9-1.5h-4.2c-.9.1-1.6.7-1.9 1.5l-1.1 3.2c-.2.5-.1 1.1.3 1.5l1.8 1.8V21c0 .6.4 1 1 1h4c.6 0 1-.4 1-1z"/></svg>`,
+                title: "Upper Body Pulling Progression (Full Bar)",
+                drills: ["Negative Pull-ups (5-sec descent): 3 x 5 reps", "Resistance Band Assisted Pull-ups: 3 x 8 reps", "Dead Hangs: 3 x 45 seconds"]
+            },
+            '4 x 10m Shuttle Run': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm5 7.7l-2.6-1.3-1.6 3.2 2.7 4c.4.6.3 1.4-.3 1.8-.6.4-1.4.3-1.8-.3l-3-4.5c-.3-.5-.3-1.1 0-1.6l1.6-3.2-2.5-1.3c-.6-.3-1-.9-1-1.6V6.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5v1.8l3 1.5c.7.4 1 1.2.7 1.9-.2.7-.8 1.1-1.6.8zM4 19h6c.6 0 1 .4 1 1s-.4 1-1 1H4c-.6 0-1-.4-1-1s.4-1 1-1z"/></svg>`,
+                title: "Agility & Direction Change Conditioning",
+                drills: ["Cone Shuttle Sprints (5m-10m-5m): 4 sets", "Lateral Shuffle Drills: 3 x 30 seconds", "Explosive Plant-and-Pivot Starts"]
+            },
+            '2.4 km Run-Walk': {
+                svg: `<svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm7.2 8.8l-3.2-1.6-1.5 3 2.2 3.3c.4.6.3 1.4-.3 1.8-.6.4-1.4.3-1.8-.3l-2.6-3.9c-.3-.5-.3-1.1 0-1.6l1.8-3.6-2.8-1.4c-.5-.3-.9-.8-1-1.4l-.6-3.2c-.1-.7.2-1.4.8-1.8l3.6-2.2c.7-.4 1.6-.2 2 .5l1.6 2.7 2.4 1.2c.7.3 1 1.1.7 1.8-.3.7-1.1 1-1.8.7z"/></svg>`,
+                title: "Aerobic Capacity & Pace Conditioning",
+                drills: ["400m Track Intervals: 4 x 400m at target pace", "Tempo Distance Runs: 15–20 mins continuous", "Consistent Lap-Pacing Strategy Exercises"]
+            }
+        };
+
+        document.getElementById('gender').addEventListener('change', resetInputsSection);
+        document.getElementById('age').addEventListener('change', resetInputsSection);
+
+        function resetInputsSection() {
+            document.getElementById('standards-preview-box').style.display = 'none';
+            document.getElementById('score-inputs-section').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('improvement').style.display = 'none';
+        }
+
+        function getPullUpName(gender, ageGroup) {
+            if (gender === 'female') {
+                return 'Inclined Pull-ups';
+            }
+            if (ageGroup === '12' || ageGroup === '13' || ageGroup === '14') {
+                return 'Inclined Pull-ups';
+            } else {
+                return 'Full Pull-ups';
+            }
+        }
+
+        function confirmProfile() {
+            const gender = document.getElementById('gender').value;
+            const ageGroup = document.getElementById('age').value;
+            const label = document.getElementById('pull-ups-label');
+            const previewBox = document.getElementById('standards-preview-box');
+            const entryArea = document.getElementById('score-inputs-section');
+
+            if (!gender || !ageGroup) {
+                alert('Please select both Age and Gender.');
+                return;
+            }
+
+            const pullUpName = getPullUpName(gender, ageGroup);
+            label.textContent = `Number of ${pullUpName} in 30 sec:`;
+
+            const standards = getStandards(gender, ageGroup);
+            if (!standards) {
+                alert('Error fetching dataset standard structure.');
+                return;
+            }
+
+            let displayAge = ageGroup === '20-24' ? '20-24' : `Age ${ageGroup}`;
+            let html = `<h3>Official Target Score Grid (${displayAge} - ${gender.charAt(0).toUpperCase() + gender.slice(1)})</h3>`;
+            html += `<table class="preview-table">
+                <tr>
+                    <th>Station</th>
+                    <th>Grade A (5pts)</th>
+                    <th>Grade B (4pts)</th>
+                    <th>Grade C (3pts)</th>
+                    <th>Grade D (2pts)</th>
+                    <th>Grade E (1pt)</th>
+                </tr>`;
+
+            const rows = [
+                { name: 'Sit-ups', data: standards.sitUps, isTime: false },
+                { name: 'Standing Broad Jump (cm)', data: standards.broadJump, isTime: false },
+                { name: 'Sit & Reach (cm)', data: standards.sitReach, isTime: false },
+                { name: pullUpName, data: standards.pullUps, isTime: false },
+                { name: '4x10m Shuttle Run (sec)', data: standards.shuttleRun, isTime: true },
+                { name: '2.4 km Run-Walk (min:sec)', data: standards.runWalk, isTime: true, is2400: true }
+            ];
+
+            rows.forEach(row => {
+                html += `<tr><td><strong>${row.name}</strong></td>`;
+                ['A', 'B', 'C', 'D', 'E'].forEach(gradeLetter => {
+                    const gradeData = row.data.find(g => g.grade === gradeLetter);
+                    if (gradeData) {
+                        if (row.isTime) {
+                            if (row.is2400) {
+                                html += `<td>≤ ${formatTime(gradeData.max)}</td>`;
+                            } else {
+                                html += `<td>≤ ${gradeData.max.toFixed(1)}s</td>`;
+                            }
+                        } else {
+                            html += `<td>≥ ${gradeData.min}</td>`;
+                        }
+                    } else {
+                        html += `<td>-</td>`;
+                    }
+                });
+                html += `</tr>`;
+            });
+
+            html += `</table>`;
+            previewBox.innerHTML = html;
+            
+            previewBox.style.display = 'block';
+            entryArea.style.display = 'block';
+        }
+
+        function calculateAward() {
+            const ageGroup = document.getElementById('age').value;
+            const gender = document.getElementById('gender').value;
+            const sitUps = parseInt(document.getElementById('sit-ups').value);
+            const broadJump = parseInt(document.getElementById('broad-jump').value);
+            const sitReach = parseInt(document.getElementById('sit-reach').value);
+            const pullUps = parseInt(document.getElementById('pull-ups').value);
+            const shuttleRun = parseFloat(document.getElementById('shuttle-run').value);
+            
+            const runWalkInput = document.getElementById('run-walk').value.trim();
+            if (!runWalkInput.includes(':')) {
+                alert('Please enter 2.4km time in format MM:SS (e.g. 14:15)');
+                return;
+            }
+            const runWalkParts = runWalkInput.split(':');
+            const runWalkMinutes = parseInt(runWalkParts[0]);
+            const runWalkSeconds = parseInt(runWalkParts[1]);
+            const runWalkTime = runWalkMinutes * 60 + runWalkSeconds;
+            
+            if (isNaN(sitUps) || isNaN(broadJump) || isNaN(sitReach) || isNaN(pullUps) || isNaN(shuttleRun) || isNaN(runWalkTime)) {
+                alert('Please fill out all metric entry values correctly.');
+                return;
+            }
+            
+            const standards = getStandards(gender, ageGroup);
+            
+            const sitUpsResult = calculateGradeAndPoints(sitUps, standards.sitUps);
+            const broadJumpResult = calculateGradeAndPoints(broadJump, standards.broadJump);
+            const sitReachResult = calculateGradeAndPoints(sitReach, standards.sitReach);
+            const pullUpsResult = calculateGradeAndPoints(pullUps, standards.pullUps);
+            const shuttleRunResult = calculateGradeAndPoints(shuttleRun, standards.shuttleRun, true);
+            const runWalkResult = calculateGradeAndPoints(runWalkTime, standards.runWalk, true);
+            
+            const totalPoints = sitUpsResult.points + broadJumpResult.points + 
+                               sitReachResult.points + pullUpsResult.points + 
+                               shuttleRunResult.points + runWalkResult.points;
+            
+            const gradeValues = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
+            
+            const sitUpsGradeValue = gradeValues[sitUpsResult.grade];
+            const broadJumpGradeValue = gradeValues[broadJumpResult.grade];
+            const sitReachGradeValue = gradeValues[sitReachResult.grade];
+            const pullUpsGradeValue = gradeValues[pullUpsResult.grade];
+            const shuttleRunGradeValue = gradeValues[shuttleRunResult.grade];
+            const runWalkGradeValue = gradeValues[runWalkResult.grade];
+
+            let award = '';
+            let awardClass = '';
+
+            if (sitUpsGradeValue >= 3 && broadJumpGradeValue >= 3 && sitReachGradeValue >= 3 && 
+                pullUpsGradeValue >= 3 && shuttleRunGradeValue >= 3 && runWalkGradeValue >= 3 && totalPoints >= 21) {
+                award = 'Gold';
+                awardClass = 'gold';
+            } 
+            else if (sitUpsGradeValue >= 2 && broadJumpGradeValue >= 2 && sitReachGradeValue >= 2 && 
+                     pullUpsGradeValue >= 2 && shuttleRunGradeValue >= 2 && runWalkGradeValue >= 2 && totalPoints >= 15) {
+                award = 'Silver';
+                awardClass = 'silver';
+            } 
+            else if (sitUpsGradeValue >= 1 && broadJumpGradeValue >= 1 && sitReachGradeValue >= 1 && 
+                     pullUpsGradeValue >= 1 && shuttleRunGradeValue >= 1 && runWalkGradeValue >= 1 && totalPoints >= 6) {
+                award = 'Bronze';
+                awardClass = 'bronze';
+            } 
+            else {
+                award = 'No Award';
+                awardClass = 'no-award';
+            }
+            
+            const pullUpVariantName = getPullUpName(gender, ageGroup);
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <h2>Your NAPFA Results</h2>
+                <p><strong>Award Classification:</strong> <span class="${awardClass}">${award}</span></p>
+                <p><strong>Accumulated Total Score:</strong> ${totalPoints} / 30 Points</p>
+                <table>
+                    <tr>
+                        <th>Station</th>
+                        <th>Your Score</th>
+                        <th>Grade Obtained</th>
+                        <th>Points Distributed</th>
+                    </tr>
+                    <tr><td>Sit-ups</td><td>${sitUps}</td><td>${sitUpsResult.grade}</td><td>${sitUpsResult.points}</td></tr>
+                    <tr><td>Standing Broad Jump</td><td>${broadJump} cm</td><td>${broadJumpResult.grade}</td><td>${broadJumpResult.points}</td></tr>
+                    <tr><td>Sit & Reach</td><td>${sitReach} cm</td><td>${sitReachResult.grade}</td><td>${sitReachResult.points}</td></tr>
+                    <tr><td>${pullUpVariantName}</td><td>${pullUps}</td><td>${pullUpsResult.grade}</td><td>${pullUpsResult.points}</td></tr>
+                    <tr><td>4 x 10m Shuttle Run</td><td>${shuttleRun} s</td><td>${shuttleRunResult.grade}</td><td>${shuttleRunResult.points}</td></tr>
+                    <tr><td>2.4 km Run-Walk</td><td>${formatTime(runWalkTime)}</td><td>${runWalkResult.grade}</td><td>${runWalkResult.points}</td></tr>
+                </table>
+            `;
+            resultDiv.style.display = 'block';
+            
+            const improvementDiv = document.getElementById('improvement');
+            if (award !== 'Gold') {
+                let nextAward = '', nextMinGrade = '', nextMinPoints = 0;
+                if (award === 'No Award') { nextAward = 'Bronze'; nextMinGrade = 'E'; nextMinPoints = 6; }
+                else if (award === 'Bronze') { nextAward = 'Silver'; nextMinGrade = 'D'; nextMinPoints = 15; }
+                else if (award === 'Silver') { nextAward = 'Gold'; nextMinGrade = 'C'; nextMinPoints = 21; }
+
+                const stations = [
+                    { name: 'Sit-ups', currentGrade: sitUpsResult.grade, currentValue: sitUps, standards: standards.sitUps, isTime: false },
+                    { name: 'Standing Broad Jump', currentGrade: broadJumpResult.grade, currentValue: broadJump, standards: standards.broadJump, isTime: false },
+                    { name: 'Sit & Reach', currentGrade: sitReachResult.grade, currentValue: sitReach, standards: standards.sitReach, isTime: false },
+                    { name: pullUpVariantName, currentGrade: pullUpsResult.grade, currentValue: pullUps, standards: standards.pullUps, isTime: false },
+                    { name: '4 x 10m Shuttle Run', currentGrade: shuttleRunResult.grade, currentValue: shuttleRun, standards: standards.shuttleRun, isTime: true },
+                    { name: '2.4 km Run-Walk', currentGrade: runWalkResult.grade, currentValue: runWalkTime, standards: standards.runWalk, isTime: true }
+                ];
+                
+                let improvementHtml = `<h3>To achieve ${nextAward} award:</h3>`;
+                const pointsNeeded = Math.max(0, nextMinPoints - totalPoints);
+                
+                if (pointsNeeded > 0) {
+                    improvementHtml += `<p>You require <strong>${pointsNeeded} more points</strong> across your stations.</p>`;
+                }
+                improvementHtml += `<p>Every individual station must score at least a <strong>Grade ${nextMinGrade}</strong>.</p><ul class="improvement-list">`;
+                
+                stations.forEach(station => {
+                    if (gradeValues[station.currentGrade] < gradeValues[nextMinGrade]) {
+                        const targetLevel = station.standards.find(s => s.grade === nextMinGrade);
+                        if (targetLevel) {
+                            improvementHtml += getImprovementSuggestion(station, targetLevel, nextMinGrade);
+                        }
+                    }
+                });
+                improvementHtml += `</ul>`;
+                improvementDiv.innerHTML = improvementHtml;
+                improvementDiv.style.display = 'block';
+            } else {
+                improvementDiv.style.display = 'none';
+            }
+        }
+        
+        function getImprovementSuggestion(station, targetLevel, targetGrade) {
+            let suggestion = `<li class="improvement-item"><div><strong>${station.name}:</strong> `;
+            if (station.isTime) {
+                const currentFormatted = station.name === '2.4 km Run-Walk' ? formatTime(station.currentValue) : station.currentValue.toFixed(1) + 's';
+                const targetFormatted = station.name === '2.4 km Run-Walk' ? formatTime(targetLevel.max) : targetLevel.max.toFixed(1) + 's';
+                suggestion += `Cut down from ${currentFormatted} to <span style="color:#2e7d32; font-weight:bold;">≤ ${targetFormatted}</span>`;
+            } else {
+                suggestion += `Increase from ${station.currentValue} to <span style="color:#2e7d32; font-weight:bold;">≥ ${targetLevel.min}</span>`;
+            }
+            suggestion += ` (To secure Grade ${targetGrade})</div>`;
+            
+            const guide = trainingGuideMap[station.name];
+            if (guide) {
+                suggestion += `
+                <details open>
+                    <summary>📋 Targeted Training Guide</summary>
+                    <div class="training-card">
+                        <div class="training-svg-container">
+                            ${guide.svg}
+                        </div>
+                        <div class="training-info">
+                            <strong>${guide.title}</strong>
+                            <ul>
+                                ${guide.drills.map(d => `<li>${d}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </details>`;
+            }
+            
+            suggestion += `</li>`;
+            return suggestion;
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+        
+        function calculateGradeAndPoints(value, standards, isTimeBased = false) {
+            const minE = standards.find(s => s.grade === 'E');
+            if (isTimeBased) {
+                if (value > minE.max) return { grade: 'F', points: 0 };
+            } else {
+                if (value < minE.min) return { grade: 'F', points: 0 };
+            }
+            for (const standard of standards) {
+                if (isTimeBased) {
+                    if (value <= standard.max) return { grade: standard.grade, points: standard.points };
+                } else {
+                    if (value >= standard.min) return { grade: standard.grade, points: standard.points };
+                }
+            }
+            return { grade: 'E', points: 1 };
+        }
+        
+        function getStandards(gender, ageGroup) {
+            if (gender === 'male') {
+                switch(ageGroup) {
+                    case '12':
+                        return {
+                            sitUps: [{ grade: 'A', min: 42, max: Infinity, points: 5 }, { grade: 'B', min: 36, max: 41, points: 4 }, { grade: 'C', min: 32, max: 35, points: 3 }, { grade: 'D', min: 27, max: 31, points: 2 }, { grade: 'E', min: 22, max: 26, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 203, max: Infinity, points: 5 }, { grade: 'B', min: 189, max: 202, points: 4 }, { grade: 'C', min: 176, max: 188, points: 3 }, { grade: 'D', min: 163, max: 175, points: 2 }, { grade: 'E', min: 150, max: 162, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 40, max: Infinity, points: 5 }, { grade: 'B', min: 36, max: 39, points: 4 }, { grade: 'C', min: 32, max: 35, points: 3 }, { grade: 'D', min: 28, max: 31, points: 2 }, { grade: 'E', min: 23, max: 27, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 25, max: Infinity, points: 5 }, { grade: 'B', min: 21, max: 24, points: 4 }, { grade: 'C', min: 16, max: 20, points: 3 }, { grade: 'D', min: 11, max: 15, points: 2 }, { grade: 'E', min: 5, max: 10, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.3, points: 5 }, { grade: 'B', min: 10.4, max: 10.9, points: 4 }, { grade: 'C', min: 11.0, max: 11.3, points: 3 }, { grade: 'D', min: 11.4, max: 11.7, points: 2 }, { grade: 'E', min: 11.8, max: 12.2, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 720, points: 5 }, { grade: 'B', min: 721, max: 790, points: 4 }, { grade: 'C', min: 791, max: 860, points: 3 }, { grade: 'D', min: 861, max: 930, points: 2 }, { grade: 'E', min: 931, max: 1010, points: 1 }]
+                        };
+                    case '13':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 38, max: 42, points: 4 }, { grade: 'C', min: 34, max: 37, points: 3 }, { grade: 'D', min: 29, max: 33, points: 2 }, { grade: 'E', min: 25, max: 28, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 215, max: Infinity, points: 5 }, { grade: 'B', min: 202, max: 214, points: 4 }, { grade: 'C', min: 189, max: 201, points: 3 }, { grade: 'D', min: 176, max: 188, points: 2 }, { grade: 'E', min: 164, max: 175, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 42, max: Infinity, points: 5 }, { grade: 'B', min: 38, max: 41, points: 4 }, { grade: 'C', min: 34, max: 37, points: 3 }, { grade: 'D', min: 30, max: 33, points: 2 }, { grade: 'E', min: 25, max: 29, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 26, max: Infinity, points: 5 }, { grade: 'B', min: 22, max: 25, points: 4 }, { grade: 'C', min: 17, max: 21, points: 3 }, { grade: 'D', min: 12, max: 16, points: 2 }, { grade: 'E', min: 7, max: 11, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.2, points: 5 }, { grade: 'B', min: 10.3, max: 10.7, points: 4 }, { grade: 'C', min: 10.8, max: 11.1, points: 3 }, { grade: 'D', min: 11.2, max: 11.5, points: 2 }, { grade: 'E', min: 11.6, max: 11.9, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 690, points: 5 }, { grade: 'B', min: 691, max: 750, points: 4 }, { grade: 'C', min: 751, max: 820, points: 3 }, { grade: 'D', min: 821, max: 890, points: 2 }, { grade: 'E', min: 891, max: 960, points: 1 }]
+                        };
+                    case '14':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 33, max: 36, points: 2 }, { grade: 'E', min: 29, max: 32, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 226, max: Infinity, points: 5 }, { grade: 'B', min: 216, max: 225, points: 4 }, { grade: 'C', min: 206, max: 215, points: 3 }, { grade: 'D', min: 196, max: 205, points: 2 }, { grade: 'E', min: 186, max: 195, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 44, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 43, points: 4 }, { grade: 'C', min: 36, max: 39, points: 3 }, { grade: 'D', min: 32, max: 35, points: 2 }, { grade: 'E', min: 27, max: 31, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 27, max: Infinity, points: 5 }, { grade: 'B', min: 23, max: 26, points: 4 }, { grade: 'C', min: 18, max: 22, points: 3 }, { grade: 'D', min: 13, max: 17, points: 2 }, { grade: 'E', min: 8, max: 12, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.1, points: 5 }, { grade: 'B', min: 10.2, max: 10.4, points: 4 }, { grade: 'C', min: 10.5, max: 10.8, points: 3 }, { grade: 'D', min: 10.9, max: 11.2, points: 2 }, { grade: 'E', min: 11.3, max: 11.6, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 660, points: 5 }, { grade: 'B', min: 661, max: 720, points: 4 }, { grade: 'C', min: 721, max: 780, points: 3 }, { grade: 'D', min: 781, max: 850, points: 2 }, { grade: 'E', min: 851, max: 920, points: 1 }]
+                        };
+                    case '15':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 34, max: 36, points: 2 }, { grade: 'E', min: 31, max: 33, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 238, max: Infinity, points: 5 }, { grade: 'B', min: 228, max: 237, points: 4 }, { grade: 'C', min: 218, max: 227, points: 3 }, { grade: 'D', min: 208, max: 217, points: 2 }, { grade: 'E', min: 198, max: 207, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 46, max: Infinity, points: 5 }, { grade: 'B', min: 42, max: 45, points: 4 }, { grade: 'C', min: 38, max: 41, points: 3 }, { grade: 'D', min: 34, max: 37, points: 2 }, { grade: 'E', min: 29, max: 33, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 8, max: Infinity, points: 5 }, { grade: 'B', min: 6, max: 7, points: 4 }, { grade: 'C', min: 5, max: 5, points: 3 }, { grade: 'D', min: 3, max: 4, points: 2 }, { grade: 'E', min: 1, max: 2, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.1, points: 5 }, { grade: 'B', min: 10.2, max: 10.3, points: 4 }, { grade: 'C', min: 10.4, max: 10.5, points: 3 }, { grade: 'D', min: 10.6, max: 10.9, points: 2 }, { grade: 'E', min: 11.0, max: 11.3, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 640, points: 5 }, { grade: 'B', min: 641, max: 700, points: 4 }, { grade: 'C', min: 701, max: 760, points: 3 }, { grade: 'D', min: 761, max: 820, points: 2 }, { grade: 'E', min: 821, max: 880, points: 1 }]
+                        };
+                    case '16':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 34, max: 36, points: 2 }, { grade: 'E', min: 31, max: 33, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 246, max: Infinity, points: 5 }, { grade: 'B', min: 236, max: 245, points: 4 }, { grade: 'C', min: 226, max: 235, points: 3 }, { grade: 'D', min: 216, max: 225, points: 2 }, { grade: 'E', min: 206, max: 215, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 47, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 47, points: 4 }, { grade: 'C', min: 40, max: 43, points: 3 }, { grade: 'D', min: 36, max: 39, points: 2 }, { grade: 'E', min: 31, max: 35, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 9, max: Infinity, points: 5 }, { grade: 'B', min: 7, max: 8, points: 4 }, { grade: 'C', min: 5, max: 6, points: 3 }, { grade: 'D', min: 3, max: 4, points: 2 }, { grade: 'E', min: 1, max: 2, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.1, points: 5 }, { grade: 'B', min: 10.2, max: 10.3, points: 4 }, { grade: 'C', min: 10.4, max: 10.5, points: 3 }, { grade: 'D', min: 10.6, max: 10.7, points: 2 }, { grade: 'E', min: 10.8, max: 11.1, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 630, points: 5 }, { grade: 'B', min: 631, max: 690, points: 4 }, { grade: 'C', min: 691, max: 740, points: 3 }, { grade: 'D', min: 741, max: 800, points: 2 }, { grade: 'E', min: 801, max: 850, points: 1 }]
+                        };
+                    case '17':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 34, max: 36, points: 2 }, { grade: 'E', min: 31, max: 33, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 249, max: Infinity, points: 5 }, { grade: 'B', min: 240, max: 249, points: 4 }, { grade: 'C', min: 230, max: 239, points: 3 }, { grade: 'D', min: 220, max: 229, points: 2 }, { grade: 'E', min: 210, max: 219, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 48, max: Infinity, points: 5 }, { grade: 'B', min: 45, max: 48, points: 4 }, { grade: 'C', min: 41, max: 44, points: 3 }, { grade: 'D', min: 37, max: 40, points: 2 }, { grade: 'E', min: 32, max: 36, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 10, max: Infinity, points: 5 }, { grade: 'B', min: 8, max: 9, points: 4 }, { grade: 'C', min: 6, max: 7, points: 3 }, { grade: 'D', min: 4, max: 5, points: 2 }, { grade: 'E', min: 2, max: 3, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.2, points: 5 }, { grade: 'B', min: 10.2, max: 10.3, points: 4 }, { grade: 'C', min: 10.4, max: 10.5, points: 3 }, { grade: 'D', min: 10.6, max: 10.7, points: 2 }, { grade: 'E', min: 10.8, max: 10.9, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 621, points: 5 }, { grade: 'B', min: 621, max: 670, points: 4 }, { grade: 'C', min: 671, max: 720, points: 3 }, { grade: 'D', min: 721, max: 770, points: 2 }, { grade: 'E', min: 771, max: 820, points: 1 }]
+                        };
+                    case '18':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 34, max: 36, points: 2 }, { grade: 'E', min: 31, max: 33, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 252, max: Infinity, points: 5 }, { grade: 'B', min: 242, max: 251, points: 4 }, { grade: 'C', min: 232, max: 241, points: 3 }, { grade: 'D', min: 222, max: 231, points: 2 }, { grade: 'E', min: 212, max: 221, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 48, max: Infinity, points: 5 }, { grade: 'B', min: 45, max: 48, points: 4 }, { grade: 'C', min: 41, max: 44, points: 3 }, { grade: 'D', min: 37, max: 40, points: 2 }, { grade: 'E', min: 32, max: 36, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 11, max: Infinity, points: 5 }, { grade: 'B', min: 9, max: 10, points: 4 }, { grade: 'C', min: 7, max: 8, points: 3 }, { grade: 'D', min: 5, max: 6, points: 2 }, { grade: 'E', min: 3, max: 4, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.2, points: 5 }, { grade: 'B', min: 10.2, max: 10.3, points: 4 }, { grade: 'C', min: 10.4, max: 10.5, points: 3 }, { grade: 'D', min: 10.6, max: 10.7, points: 2 }, { grade: 'E', min: 10.8, max: 10.9, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 621, points: 5 }, { grade: 'B', min: 621, max: 670, points: 4 }, { grade: 'C', min: 671, max: 710, points: 3 }, { grade: 'D', min: 711, max: 760, points: 2 }, { grade: 'E', min: 761, max: 810, points: 1 }]
+                        };
+                    case '19':
+                        return {
+                            sitUps: [{ grade: 'A', min: 43, max: Infinity, points: 5 }, { grade: 'B', min: 40, max: 42, points: 4 }, { grade: 'C', min: 37, max: 39, points: 3 }, { grade: 'D', min: 34, max: 36, points: 2 }, { grade: 'E', min: 31, max: 33, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 252, max: Infinity, points: 5 }, { grade: 'B', min: 242, max: 251, points: 4 }, { grade: 'C', min: 232, max: 241, points: 3 }, { grade: 'D', min: 222, max: 231, points: 2 }, { grade: 'E', min: 212, max: 221, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 49, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 50, points: 4 }, { grade: 'C', min: 37, max: 43, points: 3 }, { grade: 'D', min: 30, max: 36, points: 2 }, { grade: 'E', min: 23, max: 29, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 11, max: Infinity, points: 5 }, { grade: 'B', min: 9, max: 10, points: 4 }, { grade: 'C', min: 7, max: 8, points: 3 }, { grade: 'D', min: 5, max: 6, points: 2 }, { grade: 'E', min: 3, max: 4, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.2, points: 5 }, { grade: 'B', min: 10.2, max: 10.3, points: 4 }, { grade: 'C', min: 10.4, max: 10.5, points: 3 }, { grade: 'D', min: 10.6, max: 10.7, points: 2 }, { grade: 'E', min: 10.8, max: 10.9, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 621, points: 5 }, { grade: 'B', min: 621, max: 660, points: 4 }, { grade: 'C', min: 661, max: 700, points: 3 }, { grade: 'D', min: 701, max: 750, points: 2 }, { grade: 'E', min: 751, max: 800, points: 1 }]
+                        };
+                    case '20-24':
+                        return {
+                            sitUps: [{ grade: 'A', min: 40, max: Infinity, points: 5 }, { grade: 'B', min: 37, max: 39, points: 4 }, { grade: 'C', min: 34, max: 36, points: 3 }, { grade: 'D', min: 31, max: 33, points: 2 }, { grade: 'E', min: 28, max: 30, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 243, max: Infinity, points: 5 }, { grade: 'B', min: 234, max: 242, points: 4 }, { grade: 'C', min: 225, max: 233, points: 3 }, { grade: 'D', min: 216, max: 224, points: 2 }, { grade: 'E', min: 207, max: 215, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 51, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 50, points: 4 }, { grade: 'C', min: 37, max: 43, points: 3 }, { grade: 'D', min: 30, max: 36, points: 2 }, { grade: 'E', min: 23, max: 29, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 11, max: Infinity, points: 5 }, { grade: 'B', min: 9, max: 10, points: 4 }, { grade: 'C', min: 7, max: 8, points: 3 }, { grade: 'D', min: 5, max: 6, points: 2 }, { grade: 'E', min: 3, max: 4, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 10.3, points: 5 }, { grade: 'B', min: 10.4, max: 10.5, points: 4 }, { grade: 'C', min: 10.6, max: 10.7, points: 3 }, { grade: 'D', min: 10.8, max: 10.9, points: 2 }, { grade: 'E', min: 11.0, max: 11.1, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 621, points: 5 }, { grade: 'B', min: 621, max: 660, points: 4 }, { grade: 'C', min: 661, max: 700, points: 3 }, { grade: 'D', min: 701, max: 740, points: 2 }, { grade: 'E', min: 741, max: 780, points: 1 }]
+                        };
+                }
+            } 
+            else if (gender === 'female') {
+                switch(ageGroup) {
+                    case '12':
+                        return {
+                            sitUps: [{ grade: 'A', min: 30, max: Infinity, points: 5 }, { grade: 'B', min: 25, max: 29, points: 4 }, { grade: 'C', min: 21, max: 24, points: 3 }, { grade: 'D', min: 17, max: 20, points: 2 }, { grade: 'E', min: 13, max: 16, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 168, max: Infinity, points: 5 }, { grade: 'B', min: 159, max: 167, points: 4 }, { grade: 'C', min: 150, max: 158, points: 3 }, { grade: 'D', min: 141, max: 149, points: 2 }, { grade: 'E', min: 132, max: 140, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 40, max: Infinity, points: 5 }, { grade: 'B', min: 37, max: 39, points: 4 }, { grade: 'C', min: 34, max: 36, points: 3 }, { grade: 'D', min: 30, max: 33, points: 2 }, { grade: 'E', min: 25, max: 29, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 16, max: Infinity, points: 5 }, { grade: 'B', min: 13, max: 15, points: 4 }, { grade: 'C', min: 10, max: 12, points: 3 }, { grade: 'D', min: 7, max: 9, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.4, points: 5 }, { grade: 'B', min: 11.5, max: 11.9, points: 4 }, { grade: 'C', min: 12.0, max: 12.3, points: 3 }, { grade: 'D', min: 12.4, max: 12.7, points: 2 }, { grade: 'E', min: 12.8, max: 13.2, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 880, points: 5 }, { grade: 'B', min: 881, max: 940, points: 4 }, { grade: 'C', min: 941, max: 1000, points: 3 }, { grade: 'D', min: 1001, max: 1060, points: 2 }, { grade: 'E', min: 1061, max: 1120, points: 1 }]
+                        };
+                    case '13':
+                        return {
+                            sitUps: [{ grade: 'A', min: 31, max: Infinity, points: 5 }, { grade: 'B', min: 26, max: 30, points: 4 }, { grade: 'C', min: 22, max: 25, points: 3 }, { grade: 'D', min: 18, max: 21, points: 2 }, { grade: 'E', min: 14, max: 17, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 171, max: Infinity, points: 5 }, { grade: 'B', min: 162, max: 170, points: 4 }, { grade: 'C', min: 153, max: 161, points: 3 }, { grade: 'D', min: 144, max: 152, points: 2 }, { grade: 'E', min: 135, max: 143, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 42, max: Infinity, points: 5 }, { grade: 'B', min: 39, max: 41, points: 4 }, { grade: 'C', min: 36, max: 38, points: 3 }, { grade: 'D', min: 32, max: 35, points: 2 }, { grade: 'E', min: 27, max: 31, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 13, max: 16, points: 4 }, { grade: 'C', min: 10, max: 12, points: 3 }, { grade: 'D', min: 7, max: 9, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.2, points: 5 }, { grade: 'B', min: 11.3, max: 11.7, points: 4 }, { grade: 'C', min: 11.8, max: 12.2, points: 3 }, { grade: 'D', min: 12.3, max: 12.7, points: 2 }, { grade: 'E', min: 12.8, max: 13.2, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 870, points: 5 }, { grade: 'B', min: 871, max: 930, points: 4 }, { grade: 'C', min: 931, max: 990, points: 3 }, { grade: 'D', min: 991, max: 1050, points: 2 }, { grade: 'E', min: 1051, max: 1110, points: 1 }]
+                        };
+                    case '14':
+                        return {
+                            sitUps: [{ grade: 'A', min: 31, max: Infinity, points: 5 }, { grade: 'B', min: 28, max: 30, points: 4 }, { grade: 'C', min: 24, max: 27, points: 3 }, { grade: 'D', min: 20, max: 23, points: 2 }, { grade: 'E', min: 16, max: 19, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 178, max: Infinity, points: 5 }, { grade: 'B', min: 169, max: 177, points: 4 }, { grade: 'C', min: 160, max: 168, points: 3 }, { grade: 'D', min: 151, max: 159, points: 2 }, { grade: 'E', min: 142, max: 150, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 44, max: Infinity, points: 5 }, { grade: 'B', min: 41, max: 43, points: 4 }, { grade: 'C', min: 38, max: 40, points: 3 }, { grade: 'D', min: 34, max: 37, points: 2 }, { grade: 'E', min: 29, max: 33, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 14, max: 16, points: 4 }, { grade: 'C', min: 10, max: 13, points: 3 }, { grade: 'D', min: 7, max: 9, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.4, points: 5 }, { grade: 'B', min: 11.5, max: 11.8, points: 4 }, { grade: 'C', min: 11.9, max: 12.2, points: 3 }, { grade: 'D', min: 12.3, max: 12.6, points: 2 }, { grade: 'E', min: 12.7, max: 13.0, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 860, points: 5 }, { grade: 'B', min: 861, max: 920, points: 4 }, { grade: 'C', min: 921, max: 980, points: 3 }, { grade: 'D', min: 981, max: 1040, points: 2 }, { grade: 'E', min: 1041, max: 1100, points: 1 }]
+                        };
+                    case '15':
+                        return {
+                            sitUps: [{ grade: 'A', min: 31, max: Infinity, points: 5 }, { grade: 'B', min: 29, max: 30, points: 4 }, { grade: 'C', min: 25, max: 28, points: 3 }, { grade: 'D', min: 21, max: 24, points: 2 }, { grade: 'E', min: 17, max: 20, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 183, max: Infinity, points: 5 }, { grade: 'B', min: 174, max: 182, points: 4 }, { grade: 'C', min: 165, max: 173, points: 3 }, { grade: 'D', min: 156, max: 164, points: 2 }, { grade: 'E', min: 147, max: 155, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 46, max: Infinity, points: 5 }, { grade: 'B', min: 43, max: 45, points: 4 }, { grade: 'C', min: 39, max: 42, points: 3 }, { grade: 'D', min: 35, max: 38, points: 2 }, { grade: 'E', min: 30, max: 34, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 14, max: 16, points: 4 }, { grade: 'C', min: 10, max: 13, points: 3 }, { grade: 'D', min: 7, max: 9, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.2, points: 5 }, { grade: 'B', min: 11.3, max: 11.6, points: 4 }, { grade: 'C', min: 11.7, max: 12.0, points: 3 }, { grade: 'D', min: 12.1, max: 12.4, points: 2 }, { grade: 'E', min: 12.5, max: 12.8, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 850, points: 5 }, { grade: 'B', min: 851, max: 910, points: 4 }, { grade: 'C', min: 911, max: 970, points: 3 }, { grade: 'D', min: 971, max: 1030, points: 2 }, { grade: 'E', min: 1031, max: 1090, points: 1 }]
+                        };
+                    case '16':
+                        return {
+                            sitUps: [{ grade: 'A', min: 31, max: Infinity, points: 5 }, { grade: 'B', min: 29, max: 30, points: 4 }, { grade: 'C', min: 26, max: 28, points: 3 }, { grade: 'D', min: 22, max: 25, points: 2 }, { grade: 'E', min: 18, max: 21, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 187, max: Infinity, points: 5 }, { grade: 'B', min: 178, max: 186, points: 4 }, { grade: 'C', min: 169, max: 177, points: 3 }, { grade: 'D', min: 160, max: 168, points: 2 }, { grade: 'E', min: 151, max: 159, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 47, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 46, points: 4 }, { grade: 'C', min: 40, max: 43, points: 3 }, { grade: 'D', min: 36, max: 39, points: 2 }, { grade: 'E', min: 31, max: 35, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 18, max: Infinity, points: 5 }, { grade: 'B', min: 14, max: 17, points: 4 }, { grade: 'C', min: 11, max: 13, points: 3 }, { grade: 'D', min: 7, max: 10, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.2, points: 5 }, { grade: 'B', min: 11.3, max: 11.5, points: 4 }, { grade: 'C', min: 11.6, max: 11.8, points: 3 }, { grade: 'D', min: 11.9, max: 12.2, points: 2 }, { grade: 'E', min: 12.3, max: 12.6, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 840, points: 5 }, { grade: 'B', min: 841, max: 900, points: 4 }, { grade: 'C', min: 901, max: 960, points: 3 }, { grade: 'D', min: 961, max: 1020, points: 2 }, { grade: 'E', min: 1021, max: 1070, points: 1 }]
+                        };
+                    case '17':
+                        return {
+                            sitUps: [{ grade: 'A', min: 30, max: Infinity, points: 5 }, { grade: 'B', min: 29, max: 30, points: 4 }, { grade: 'C', min: 27, max: 28, points: 3 }, { grade: 'D', min: 23, max: 26, points: 2 }, { grade: 'E', min: 19, max: 22, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 189, max: Infinity, points: 5 }, { grade: 'B', min: 181, max: 189, points: 4 }, { grade: 'C', min: 172, max: 180, points: 3 }, { grade: 'D', min: 163, max: 171, points: 2 }, { grade: 'E', min: 154, max: 162, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 46, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 46, points: 4 }, { grade: 'C', min: 40, max: 43, points: 3 }, { grade: 'D', min: 36, max: 39, points: 2 }, { grade: 'E', min: 32, max: 35, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 14, max: 17, points: 4 }, { grade: 'C', min: 11, max: 13, points: 3 }, { grade: 'D', min: 7, max: 10, points: 2 }, { grade: 'E', min: 3, max: 6, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.3, points: 5 }, { grade: 'B', min: 11.3, max: 11.5, points: 4 }, { grade: 'C', min: 11.6, max: 11.8, points: 3 }, { grade: 'D', min: 11.9, max: 12.1, points: 2 }, { grade: 'E', min: 12.2, max: 12.5, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 841, points: 5 }, { grade: 'B', min: 841, max: 890, points: 4 }, { grade: 'C', min: 891, max: 950, points: 3 }, { grade: 'D', min: 951, max: 1000, points: 2 }, { grade: 'E', min: 1001, max: 1050, points: 1 }]
+                        };
+                    case '18':
+                        return {
+                            sitUps: [{ grade: 'A', min: 30, max: Infinity, points: 5 }, { grade: 'B', min: 29, max: 30, points: 4 }, { grade: 'C', min: 27, max: 28, points: 3 }, { grade: 'D', min: 24, max: 26, points: 2 }, { grade: 'E', min: 20, max: 23, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 192, max: Infinity, points: 5 }, { grade: 'B', min: 183, max: 192, points: 4 }, { grade: 'C', min: 174, max: 182, points: 3 }, { grade: 'D', min: 165, max: 173, points: 2 }, { grade: 'E', min: 156, max: 164, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 46, max: Infinity, points: 5 }, { grade: 'B', min: 44, max: 46, points: 4 }, { grade: 'C', min: 40, max: 43, points: 3 }, { grade: 'D', min: 36, max: 39, points: 2 }, { grade: 'E', min: 32, max: 35, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 15, max: 17, points: 4 }, { grade: 'C', min: 11, max: 14, points: 3 }, { grade: 'D', min: 8, max: 10, points: 2 }, { grade: 'E', min: 4, max: 7, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.3, points: 5 }, { grade: 'B', min: 11.3, max: 11.5, points: 4 }, { grade: 'C', min: 11.6, max: 11.8, points: 3 }, { grade: 'D', min: 11.9, max: 12.1, points: 2 }, { grade: 'E', min: 12.2, max: 12.4, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 841, points: 5 }, { grade: 'B', min: 841, max: 890, points: 4 }, { grade: 'C', min: 891, max: 940, points: 3 }, { grade: 'D', min: 941, max: 990, points: 2 }, { grade: 'E', min: 991, max: 1040, points: 1 }]
+                        };
+                    case '19':
+                        return {
+                            sitUps: [{ grade: 'A', min: 30, max: Infinity, points: 5 }, { grade: 'B', min: 29, max: 30, points: 4 }, { grade: 'C', min: 27, max: 28, points: 3 }, { grade: 'D', min: 24, max: 26, points: 2 }, { grade: 'E', min: 21, max: 23, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 195, max: Infinity, points: 5 }, { grade: 'B', min: 185, max: 195, points: 4 }, { grade: 'C', min: 174, max: 184, points: 3 }, { grade: 'D', min: 165, max: 173, points: 2 }, { grade: 'E', min: 156, max: 164, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 45, max: Infinity, points: 5 }, { grade: 'B', min: 43, max: 45, points: 4 }, { grade: 'C', min: 39, max: 42, points: 3 }, { grade: 'D', min: 36, max: 38, points: 2 }, { grade: 'E', min: 32, max: 35, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 17, max: Infinity, points: 5 }, { grade: 'B', min: 15, max: 17, points: 4 }, { grade: 'C', min: 11, max: 14, points: 3 }, { grade: 'D', min: 8, max: 10, points: 2 }, { grade: 'E', min: 5, max: 7, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.3, points: 5 }, { grade: 'B', min: 11.3, max: 11.5, points: 4 }, { grade: 'C', min: 11.6, max: 11.8, points: 3 }, { grade: 'D', min: 11.9, max: 12.1, points: 2 }, { grade: 'E', min: 12.2, max: 12.4, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 861, points: 5 }, { grade: 'B', min: 861, max: 890, points: 4 }, { grade: 'C', min: 891, max: 930, points: 3 }, { grade: 'D', min: 931, max: 980, points: 2 }, { grade: 'E', min: 981, max: 1031, points: 1 }]
+                        };
+                    case '20-24':
+                        return {
+                            sitUps: [{ grade: 'A', min: 28, max: Infinity, points: 5 }, { grade: 'B', min: 27, max: 28, points: 4 }, { grade: 'C', min: 25, max: 26, points: 3 }, { grade: 'D', min: 23, max: 24, points: 2 }, { grade: 'E', min: 21, max: 22, points: 1 }],
+                            broadJump: [{ grade: 'A', min: 197, max: Infinity, points: 5 }, { grade: 'B', min: 186, max: 197, points: 4 }, { grade: 'C', min: 174, max: 185, points: 3 }, { grade: 'D', min: 162, max: 173, points: 2 }, { grade: 'E', min: 150, max: 161, points: 1 }],
+                            sitReach: [{ grade: 'A', min: 47, max: Infinity, points: 5 }, { grade: 'B', min: 42, max: 47, points: 4 }, { grade: 'C', min: 34, max: 41, points: 3 }, { grade: 'D', min: 27, max: 33, points: 2 }, { grade: 'E', min: 20, max: 26, points: 1 }],
+                            pullUps: [{ grade: 'A', min: 22, max: Infinity, points: 5 }, { grade: 'B', min: 16, max: 22, points: 4 }, { grade: 'C', min: 9, max: 15, points: 3 }, { grade: 'D', min: 5, max: 8, points: 2 }, { grade: 'E', min: 2, max: 4, points: 1 }],
+                            shuttleRun: [{ grade: 'A', min: 0, max: 11.6, points: 5 }, { grade: 'B', min: 11.6, max: 11.8, points: 4 }, { grade: 'C', min: 11.9, max: 12.1, points: 3 }, { grade: 'D', min: 12.2, max: 12.4, points: 2 }, { grade: 'E', min: 12.5, max: 12.7, points: 1 }],
+                            runWalk: [{ grade: 'A', min: 0, max: 901, points: 5 }, { grade: 'B', min: 901, max: 930, points: 4 }, { grade: 'C', min: 931, max: 960, points: 3 }, { grade: 'D', min: 961, max: 990, points: 2 }, { grade: 'E', min: 991, max: 1020, points: 1 }]
+                        };
+                }
+            }
+            return null; 
+        }
+    </script>
+</body>
+</html>
