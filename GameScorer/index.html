@@ -361,7 +361,8 @@
 
         if (cat === 'net') {
             match.setsA = 0; match.setsB = 0; match.currentSet = 1;
-            match.setScores = Array.from({length: tournamentData.config.numSets}, () => ({a: 0, b: 0}));
+            // Added intervalReached tracker
+            match.setScores = Array.from({length: tournamentData.config.numSets}, () => ({a: 0, b: 0, intervalReached: false}));
         } else if (cat === 'striking') {
             const count = tournamentData.config.numBatters;
             match.battersA = Array.from({length: count}, (_, k) => ({ name: `Batter ${k+1}`, bases: [0,0,0,0] })); 
@@ -399,10 +400,9 @@
             }
 
             if (format === 'roundrobin') {
-                // Circle Method for generating proper round-robin scheduling to avoid back-to-back games
                 let teamIndices = [];
                 for (let i = 0; i < numTeams; i++) teamIndices.push(i);
-                if (numTeams % 2 !== 0) teamIndices.push(-1); // Add a dummy BYE team if odd
+                if (numTeams % 2 !== 0) teamIndices.push(-1); 
 
                 const totalRounds = teamIndices.length - 1;
                 const matchesPerRound = teamIndices.length / 2;
@@ -422,7 +422,6 @@
                             });
                         }
                     }
-                    // Rotate the array (keep index 0 fixed, move last element to index 1)
                     teamIndices.splice(1, 0, teamIndices.pop());
                 }
             } else if (format === 'single_knockout') {
@@ -463,21 +462,20 @@
         renderMatches();
     }
 
-    /* --- DATA SAVE & LOAD LOGIC --- */
     function saveTournamentFile() {
         const dataStr = JSON.stringify(tournamentData, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         
-        const safeName = tournamentData.name ? tournamentData.name.replace(/\s+/g, '_') : 'Tournament_Data';
+        const safeName = tournamentData.name ? tournamentData.name.replace(/\\s+/g, '_') : 'Tournament_Data';
         link.download = `${safeName}.json`;
         link.href = url;
         link.click();
         
         URL.revokeObjectURL(url);
         
-        alert(`✅ Success! Your tournament data has been saved as "${safeName}.json".\n\nYou can usually find this file in your device's default "Downloads" folder. You can move it anywhere you like to keep things organized!`);
+        alert(`✅ Success! Your tournament data has been saved as "${safeName}.json".`);
     }
 
     function loadTournamentFile(event) {
@@ -491,19 +489,17 @@
                 transitionToDisplay();
             } catch (error) {
                 alert("Error loading file. Please ensure it is a valid tournament JSON file.");
-                event.target.value = ''; // Reset input
+                event.target.value = ''; 
             }
         };
         reader.readAsText(file);
     }
 
-    /* --- AD-HOC MATCH --- */
     function addManualMatch(teamA = 'TBD', teamB = 'TBD', roundLabel = 'Ad-hoc') {
         tournamentData.matches.push(createBaseMatch(tournamentData.matches.length, null, teamA, null, teamB, roundLabel));
         renderMatches();
     }
 
-    /* --- KNOCKOUT ADVANCEMENT LOGIC --- */
     function advanceWinner(matchId) {
         const match = tournamentData.matches[matchId];
         let winnerId, loserId, winnerName, loserName;
@@ -522,7 +518,7 @@
 
         if (format === 'single_knockout') {
             if (match.roundLabel === 'Grand Final' || match.roundLabel === '3rd/4th Place Match') { match.advanced = true; renderMatches(); return; }
-            let roundNum = parseInt(match.roundLabel.match(/\d+/)) || 1;
+            let roundNum = parseInt(match.roundLabel.match(/\\d+/)) || 1;
             let totalRounds = tournamentData.totalRounds;
 
             if (roundNum === totalRounds - 1 && totalRounds > 1) {
@@ -550,7 +546,7 @@
                 pushToNextMatch(oneLoss[0].id, oneLoss[0].name, 'Grand Final');
             } else {
                 let isUpper = match.roundLabel.includes('Upper');
-                let roundNum = parseInt(match.roundLabel.match(/\d+/)) || 1;
+                let roundNum = parseInt(match.roundLabel.match(/\\d+/)) || 1;
                 
                 if (isUpper) {
                     pushToNextMatch(winnerId, winnerName, `Round ${roundNum + 1} (Upper)`);
@@ -606,7 +602,6 @@
         });
     }
 
-    /* --- INVASION LOGIC --- */
     function adjustInvasionScore(matchId, teamKey, delta) {
         const match = tournamentData.matches[matchId];
         if (teamKey === 'A') match.scoreA = Math.max(0, match.scoreA + delta); else match.scoreB = Math.max(0, match.scoreB + delta);
@@ -614,10 +609,21 @@
         if (tournamentData.format === 'roundrobin') updateStandings();
     }
 
-    /* --- NET LOGIC --- */
     function adjustNetScore(matchId, teamKey, delta, setIndex) {
-        const match = tournamentData.matches[matchId]; const cfg = tournamentData.config; const setScore = match.setScores[setIndex];
-        if (teamKey === 'A') setScore.a = Math.max(0, setScore.a + delta); if (teamKey === 'B') setScore.b = Math.max(0, setScore.b + delta);
+        const match = tournamentData.matches[matchId]; 
+        const cfg = tournamentData.config; 
+        const setScore = match.setScores[setIndex];
+        
+        if (teamKey === 'A') setScore.a = Math.max(0, setScore.a + delta); 
+        if (teamKey === 'B') setScore.b = Math.max(0, setScore.b + delta);
+
+        // --- NEW INTERVAL LOGIC ---
+        const intervalTarget = Math.ceil(cfg.maxPoints / 2);
+        if (delta > 0 && !setScore.intervalReached && (setScore.a === intervalTarget || setScore.b === intervalTarget)) {
+            setScore.intervalReached = true;
+            // Timeout allows the UI to render the new score before the alert blocks it
+            setTimeout(() => alert(`⏸️ Interval! A team has reached ${intervalTarget} points in Set ${setIndex + 1}. Time for a break!`), 50);
+        }
 
         let setsA = 0; let setsB = 0; const target = cfg.maxPoints;
         match.setScores.forEach((score) => {
@@ -639,10 +645,11 @@
         const reqWins = Math.ceil(cfg.numSets / 2);
         if (newCurrentSet > cfg.numSets || setsA >= reqWins || setsB >= reqWins) { match.completed = true; match.currentSet = Math.min(newCurrentSet, cfg.numSets); } 
         else { match.completed = false; match.currentSet = newCurrentSet; }
-        renderMatches(); if (tournamentData.format === 'roundrobin') updateStandings();
+        
+        renderMatches(); 
+        if (tournamentData.format === 'roundrobin') updateStandings();
     }
 
-    /* --- STRIKING / FIELDING LOGIC --- */
     function updateBatterName(matchId, teamKey, index, name) {
         const list = teamKey === 'A' ? tournamentData.matches[matchId].battersA : tournamentData.matches[matchId].battersB;
         list[index].name = name;
@@ -668,7 +675,6 @@
         if (currentOuts >= 3 || allBatted) { if (match.currentInning === 'A') match.currentInning = 'B'; else match.completed = true; }
     }
 
-    /* --- RENDER FUNCTIONS --- */
     function renderMatches() {
         const container = document.getElementById('matchesContainer'); container.innerHTML = '';
         tournamentData.matches.forEach((m, idx) => {
@@ -735,7 +741,6 @@
         }).join('');
     }
 
-    /* --- STANDINGS TABULATION (League Only) --- */
     function updateStandings() {
         const stats = {}; tournamentData.teams.forEach(t => { stats[t.id] = { id: t.id, name: t.name, wins: 0, losses: 0, draws: 0, gf: 0, ga: 0, gd: 0, pts: 0 }; });
         tournamentData.matches.forEach(m => {
