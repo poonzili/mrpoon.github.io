@@ -399,10 +399,31 @@
             }
 
             if (format === 'roundrobin') {
-                for (let i = 0; i < numTeams; i++) {
-                    for (let j = i + 1; j < numTeams; j++) {
-                        pairings.push({ teamAId: tournamentData.teams[i].id, teamA: tournamentData.teams[i].name, teamBId: tournamentData.teams[j].id, teamB: tournamentData.teams[j].name, roundLabel: 'League' });
+                // Circle Method for generating proper round-robin scheduling to avoid back-to-back games
+                let teamIndices = [];
+                for (let i = 0; i < numTeams; i++) teamIndices.push(i);
+                if (numTeams % 2 !== 0) teamIndices.push(-1); // Add a dummy BYE team if odd
+
+                const totalRounds = teamIndices.length - 1;
+                const matchesPerRound = teamIndices.length / 2;
+
+                for (let round = 0; round < totalRounds; round++) {
+                    for (let match = 0; match < matchesPerRound; match++) {
+                        const homeIdx = teamIndices[match];
+                        const awayIdx = teamIndices[teamIndices.length - 1 - match];
+
+                        if (homeIdx !== -1 && awayIdx !== -1) {
+                            pairings.push({ 
+                                teamAId: tournamentData.teams[homeIdx].id, 
+                                teamA: tournamentData.teams[homeIdx].name, 
+                                teamBId: tournamentData.teams[awayIdx].id, 
+                                teamB: tournamentData.teams[awayIdx].name, 
+                                roundLabel: `League (Round ${round + 1})` 
+                            });
+                        }
                     }
+                    // Rotate the array (keep index 0 fixed, move last element to index 1)
+                    teamIndices.splice(1, 0, teamIndices.pop());
                 }
             } else if (format === 'single_knockout') {
                 let firstLabel = tournamentData.totalRounds === 1 ? 'Grand Final' : 'Round 1';
@@ -456,7 +477,6 @@
         
         URL.revokeObjectURL(url);
         
-        // Add a friendly alert to guide the user
         alert(`✅ Success! Your tournament data has been saved as "${safeName}.json".\n\nYou can usually find this file in your device's default "Downloads" folder. You can move it anywhere you like to keep things organized!`);
     }
 
