@@ -1,1 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPFA Sit-Up AI Scorer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <style>
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: auto; }
+        video, canvas { border-radius: 0.5rem; width: 100%; height: auto; }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 flex flex-col items-center p-4">
 
+    <div class="max-w-3xl w-full bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">NAPFA Sit-Up AI Scorer</h1>
+
+        <!-- Settings Row -->
+        <div class="flex flex-wrap justify-between gap-4 mb-4 bg-gray-50 p-4 rounded-md">
+            <div>
+                <label class="font-semibold block mb-1">Gender:</label>
+                <select id="genderSelect" class="border p-2 rounded">
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-semibold block mb-1">Age:</label>
+                <select id="ageSelect" class="border p-2 rounded">
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16" selected>16</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button id="toggleAudio" class="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600">
+                    🔊 Audio On
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="grid grid-cols-3 gap-4 text-center mb-6">
+            <div class="bg-gray-800 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Time Left</div>
+                <div id="timeDisplay" class="text-4xl font-bold">60s</div>
+            </div>
+            <div class="bg-blue-600 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Reps</div>
+                <div id="repDisplay" class="text-4xl font-bold">0</div>
+            </div>
+            <div class="bg-green-500 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Grade</div>
+                <div id="gradeDisplay" class="text-4xl font-bold">-</div>
+            </div>
+        </div>
+
+        <!-- Camera Area -->
+        <div class="video-container bg-black flex justify-center items-center shadow-inner relative">
+            <!-- Loading text -->
+            <div id="loadingText" class="absolute text-white z-0">Loading AI Camera...</div>
+            <video id="videoElement" playsinline autoplay muted></video>
+            <canvas id="canvasElement"></canvas>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-center gap-4 mt-6">
+            <button id="startBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-green-700 disabled:opacity-50">
+                Start 1-Min Test
+            </button>
+            <button id="resetBtn" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-red-600">
+                Reset
+            </button>
+        </div>
+        
+        <!-- Status Indicator -->
+        <p id="formStatus" class="text-center mt-4 text-lg font-semibold text-gray-500">
+            Lie down and face the camera to begin.
+        </p>
+    </div>
+
+    <script>
+        // --- NAPFA SCORING MATRIX (Sample Data for Sit-Ups) ---
+        const napfaScoring = {
+            "M": {
+                "13": { A: 40, B: 37, C: 34, D: 31, E: 28 },
+                "14": { A: 41, B: 38, C: 35, D: 32, E: 29 },
+                "15": { A: 42, B: 39, C: 36, D: 33, E: 30 },
+                "16": { A: 42, B: 39, C: 36, D: 33, E: 30 }
+            },
+            "F": {
+                "13": { A: 30, B: 27, C: 24, D: 21, E: 18 },
+                "14": { A: 31, B: 28, C: 25, D: 22, E: 19 },
+                "15": { A: 32, B: 29, C: 26, D: 23, E: 20 },
+                "16": { A: 32, B: 29, C: 26, D: 23, E: 20 }
+            }
+        };
+
+        // --- APP STATE ---
+        let reps = 0;
+        let situpState = "down"; 
+        let isTesting = false;
+        let timeLeft = 60;
+        let timerInterval = null;
+        let audioEnabled = true;
+        let currentGrade = "-";
+
+        // --- DOM ELEMENTS ---
+        const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('canvasElement');
+        const canvasCtx = canvasElement.getContext('2d');
+        
+        const repDisplay = document.getElementById('repDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const gradeDisplay = document.getElementById('gradeDisplay');
+        const formStatus = document.getElementById('formStatus');
+        const loadingText = document.getElementById('loadingText');
+
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const toggleAudioBtn = document.getElementById('toggleAudio');
+        const genderSelect = document.getElementById('genderSelect');
+        const ageSelect = document.getElementById('ageSelect');
+
+        // --- AUDIO ENGINE ---
+        function speak(text) {
+            if (!audioEnabled || isNaN(timeLeft)) return;
+            // Prevent speech queue buildup
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        toggleAudioBtn.addEventListener('click', () => {
+            audioEnabled = !audioEnabled;
+            toggleAudioBtn.innerText = audioEnabled ? "🔊 Audio On" : "🔇 Audio Off";
+            toggleAudioBtn.className = audioEnabled 
+                ? "bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600" 
+                : "bg-gray-400 text-white px-4 py-2 rounded shadow hover:bg-gray-500";
+        });
+
+        // --- TIMER & TEST LOGIC ---
+        startBtn.addEventListener('click', () => {
+            if (isTesting) return;
+            isTesting = true;
+            reps = 0;
+            timeLeft = 60;
+            currentGrade = "-";
+            updateDisplays();
+            speak("Ready, Set, Go!");
+            formStatus.innerText = "Test Started! Do your sit-ups!";
+            formStatus.className = "text-center mt-4 text-lg font-semibold text-green-600";
+            startBtn.disabled = true;
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timeDisplay.innerText = timeLeft + "s";
+                
+                if (timeLeft === 30) speak("30 seconds left, keep going!");
+                if (timeLeft === 10) speak("10 seconds!");
+                if (timeLeft <= 5 && timeLeft > 0) speak(timeLeft.toString());
+
+                if (timeLeft <= 0) {
+                    endTest();
+                }
+            }, 1000);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            endTest(true);
+            reps = 0;
+            timeLeft = 60;
+            currentGrade = "-";
+            updateDisplays();
+            formStatus.innerText = "Lie down and face the camera to begin.";
+            formStatus.className = "text-center mt-4 text-lg font-semibold text-gray-500";
+            speak("Timer reset.");
+        });
+
+        function endTest(manual = false) {
+            isTesting = false;
+            clearInterval(timerInterval);
+            startBtn.disabled = false;
+            if (!manual) {
+                speak(`Time's up! You completed ${reps} reps. Grade ${currentGrade}.`);
+                formStatus.innerText = `Test Over! Total Reps: ${reps}`;
+                formStatus.className = "text-center mt-4 text-lg font-semibold text-blue-600";
+            }
+        }
+
+        // --- MATH & REP COUNTING ---
+        function calculateAngle(a, b, c) {
+            // Angle between points A, B, C (B is the vertex)
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        function updateNapfaScore() {
+            const gender = genderSelect.value;
+            const age = ageSelect.value;
+            const thresholds = napfaScoring[gender][age];
+
+            let newGrade = "Fail";
+            if (reps >= thresholds.A) newGrade = "A";
+            else if (reps >= thresholds.B) newGrade = "B";
+            else if (reps >= thresholds.C) newGrade = "C";
+            else if (reps >= thresholds.D) newGrade = "D";
+            else if (reps >= thresholds.E) newGrade = "E";
+
+            if (newGrade !== currentGrade && newGrade !== "Fail" && currentGrade !== "-") {
+                speak(`Grade ${newGrade} achieved!`);
+            }
+            currentGrade = newGrade;
+            gradeDisplay.innerText = currentGrade;
+        }
+
+        function updateDisplays() {
+            repDisplay.innerText = reps;
+            timeDisplay.innerText = timeLeft + "s";
+            updateNapfaScore();
+        }
+
+        function countSitup(landmarks) {
+            if (!isTesting) return;
+
+            // Use left side landmarks (11: Shoulder, 23: Hip, 25: Knee)
+            const shoulder = landmarks[11];
+            const hip = landmarks[23];
+            const knee = landmarks[25];
+
+            // Ensure points are visible before calculating
+            if (shoulder.visibility > 0.5 && hip.visibility > 0.5 && knee.visibility > 0.5) {
+                const angle = calculateAngle(shoulder, hip, knee);
+
+                // Thresholds: > 130 is lying down, < 75 is sitting up
+                if (angle > 130) {
+                    situpState = "down";
+                }
+                if (angle < 75 && situpState === "down") {
+                    situpState = "up";
+                    reps++;
+                    updateDisplays();
+                    speak(reps.toString());
+                }
+            }
+        }
+
+        // --- MEDIAPIPE INITIALIZATION ---
+        const pose = new Pose({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }});
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults((results) => {
+            // Remove loading text once camera runs
+            if(loadingText.style.display !== 'none') {
+                loadingText.style.display = 'none';
+            }
+
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // Draw Video
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            // Draw Landmarks
+            if (results.poseLandmarks) {
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2});
+                
+                countSitup(results.poseLandmarks);
+            }
+            canvasCtx.restore();
+        });
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await pose.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+
+        camera.start();
+
+    </script>
+</body>
+</html>
