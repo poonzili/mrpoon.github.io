@@ -1,353 +1,713 @@
+html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NAPFA Sit & Reach AI Scorer</title>
-    <!-- Tailwind CSS for styling -->
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MediaPipe Libraries -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Pose Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
     <style>
-        .video-container { position: relative; width: 100%; max-width: 640px; margin: auto; }
-        video, canvas { border-radius: 0.5rem; width: 100%; height: auto; }
-        canvas { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
-        .slider-container { width: 100%; max-width: 640px; margin: auto; margin-top: 15px; }
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Ensuring strict dark theme, no white backgrounds */
+            background-color: #0f172a; /* slate-900 */
+            color: #f8fafc; /* slate-50 */
+        }
+        .glass-panel {
+            background-color: #1e293b; /* slate-800 */
+            border: 1px solid #334155; /* slate-700 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background-color: #000;
+        }
+        video {
+            display: none;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        input[type=range] {
+            accent-color: #0ea5e9; /* sky-500 */
+        }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 flex flex-col items-center p-4">
+<body class="min-h-screen flex flex-col p-4 sm:p-6 lg:items-center bg-slate-900 text-slate-50">
 
-    <div class="max-w-3xl w-full bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">NAPFA Sit & Reach AI Scorer</h1>
-
-        <!-- Settings Row (Matches Sit Up App) -->
-        <div class="flex flex-wrap justify-between gap-4 mb-4 bg-gray-50 p-4 rounded-md text-sm">
-            <div>
-                <label class="font-semibold block mb-1">Gender:</label>
-                <select id="genderSelect" class="border p-2 rounded w-24">
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                </select>
+    <header class="w-full max-w-7xl mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 glass-panel p-5 rounded-2xl">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl shadow-lg text-white">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">
+                        Sit & Reach AI Scorer
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-400 font-semibold">Automated Flexibility Measurement</p>
+                </div>
             </div>
-            <div>
-                <label class="font-semibold block mb-1">Age:</label>
-                <select id="ageSelect" class="border p-2 rounded w-24">
-                    <option value="13">13</option>
-                    <option value="14">14</option>
-                    <option value="15">15</option>
-                    <option value="16" selected>16</option>
-                </select>
-            </div>
-            <div>
-                <label class="font-semibold block mb-1">Start Line (cm):</label>
-                <input type="number" id="startLineCm" value="0" class="border p-2 rounded w-24">
-            </div>
-            <div>
-                <label class="font-semibold block mb-1">End Line (cm):</label>
-                <input type="number" id="endLineCm" value="50" class="border p-2 rounded w-24">
-            </div>
-        </div>
-
-        <!-- Target Board -->
-        <div class="mb-6 bg-blue-50 p-3 rounded-md text-center border border-blue-100">
-            <h3 class="font-bold text-blue-800 mb-2">Required Standards (cm)</h3>
-            <div id="targetBoard" class="flex justify-center gap-4 text-sm font-semibold">
-                <!-- Populated via JS -->
-            </div>
-        </div>
-
-        <!-- Dashboard (Colors perfectly match the Sit Up app: Gray, Blue, Green) -->
-        <div class="grid grid-cols-3 gap-4 text-center mb-6">
-            <div class="bg-gray-800 text-white p-4 rounded-lg shadow-md">
-                <div class="text-sm uppercase tracking-wide">Current Reach</div>
-                <div id="currentReachDisplay" class="text-3xl font-bold">0.0</div>
-            </div>
-            <div class="bg-blue-600 text-white p-4 rounded-lg shadow-md">
-                <div class="text-sm uppercase tracking-wide">Hold Timer</div>
-                <div id="holdTimerDisplay" class="text-3xl font-bold">Wait</div>
-            </div>
-            <div class="bg-green-500 text-white p-4 rounded-lg shadow-md">
-                <div class="text-sm uppercase tracking-wide">Final Score</div>
-                <div id="finalScoreDisplay" class="text-3xl font-bold">-</div>
-            </div>
-        </div>
-
-        <!-- Camera Area -->
-        <div class="video-container bg-black flex justify-center items-center shadow-inner relative">
-            <div id="loadingText" class="absolute text-white z-0">Loading AI Camera...</div>
-            <video id="videoElement" playsinline autoplay muted></video>
-            <canvas id="canvasElement"></canvas>
             
-            <!-- Warning Overlay -->
-            <div id="foulWarning" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full font-bold text-xl hidden z-20 shadow-lg">
-                ⚠️ FOUL: KNEES BENT!
-            </div>
-        </div>
-
-        <!-- Calibration Sliders -->
-        <div class="slider-container space-y-4 bg-gray-50 p-4 rounded-md">
-            <div>
-                <label class="font-semibold text-red-600 text-sm">Align Start Line on Video (Position in %):</label>
-                <input type="range" id="startSlider" min="0" max="100" value="20" class="w-full accent-red-600">
-            </div>
-            <div>
-                <label class="font-semibold text-green-600 text-sm">Align End Line on Video (Position in %):</label>
-                <input type="range" id="endSlider" min="0" max="100" value="80" class="w-full accent-green-600">
-            </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="flex justify-center gap-4 mt-6">
-            <button id="startBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-green-700 disabled:opacity-50">
-                Start Test
-            </button>
-            <button id="resetBtn" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-red-600">
-                Reset
+            <button id="toggleAudioBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition flex items-center gap-2 text-sky-400">
+                <span id="audioIcon">🔊</span>
+                <span id="audioText">Audio: ON</span>
             </button>
         </div>
+    </header>
+
+    <main class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
         
-        <p id="statusMsg" class="text-center mt-4 text-lg font-semibold text-gray-500">
-            Align the physical lines using the sliders, then click Start.
-        </p>
-    </div>
+        <!-- Left Column: Controls & Settings -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Student Profile Settings -->
+            <section class="glass-panel p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Student Profile</h2>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-2">Gender</label>
+                        <select id="genderSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-sky-500">
+                            <option value="M" selected>Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-2">Age</label>
+                        <select id="ageSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-sky-500">
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                            <option value="13">13</option>
+                            <option value="14">14</option>
+                            <option value="15">15</option>
+                            <option value="16" selected>16</option>
+                            <option value="17">17</option>
+                            <option value="18">18+</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">Camera</label>
+                    <select id="cameraSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-sky-500">
+                        <option value="">Detecting cameras...</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- NAPFA Target Standards -->
+            <section class="glass-panel p-5 rounded-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400">Target Score (cm)</h2>
+                    <span id="targetLabel" class="text-xs font-bold text-sky-400">M 16</span>
+                </div>
+                <div class="grid grid-cols-5 gap-2 text-center">
+                    <div class="bg-slate-900/80 py-3 rounded-xl border border-emerald-500/30">
+                        <div class="text-[10px] font-bold text-emerald-400">A</div>
+                        <div id="targetA" class="text-sm font-black text-white mt-1">47</div>
+                    </div>
+                    <div class="bg-slate-900/80 py-3 rounded-xl border border-teal-500/30">
+                        <div class="text-[10px] font-bold text-teal-400">B</div>
+                        <div id="targetB" class="text-sm font-black text-white mt-1">44</div>
+                    </div>
+                    <div class="bg-slate-900/80 py-3 rounded-xl border border-sky-500/30">
+                        <div class="text-[10px] font-bold text-sky-400">C</div>
+                        <div id="targetC" class="text-sm font-black text-white mt-1">40</div>
+                    </div>
+                    <div class="bg-slate-900/80 py-3 rounded-xl border border-amber-500/30">
+                        <div class="text-[10px] font-bold text-amber-400">D</div>
+                        <div id="targetD" class="text-sm font-black text-white mt-1">36</div>
+                    </div>
+                    <div class="bg-slate-900/80 py-3 rounded-xl border border-red-500/30">
+                        <div class="text-[10px] font-bold text-red-400">E</div>
+                        <div id="targetE" class="text-sm font-black text-white mt-1">31</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calibration Panel -->
+            <section class="glass-panel p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Virtual Calibration</h2>
+                
+                <div class="space-y-5">
+                    <!-- Start Line Settings -->
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-rose-400">Start Line (Visual)</span>
+                            <span id="startLineVal" class="text-xs font-bold text-slate-300">25%</span>
+                        </div>
+                        <input type="range" id="startLineSlider" min="5" max="95" value="25" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer mb-3">
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-slate-400">Physical Value:</span>
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="startPhysicalInput" value="0" class="w-16 bg-slate-800 border border-slate-600 text-center font-bold text-white text-sm rounded-lg py-1 outline-none">
+                                <span class="text-xs text-slate-400 font-bold">cm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- End Line Settings -->
+                    <div class="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-emerald-400">End Line (Visual)</span>
+                            <span id="endLineVal" class="text-xs font-bold text-slate-300">75%</span>
+                        </div>
+                        <input type="range" id="endLineSlider" min="5" max="95" value="75" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer mb-3">
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-semibold text-slate-400">Physical Value:</span>
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="endPhysicalInput" value="50" class="w-16 bg-slate-800 border border-slate-600 text-center font-bold text-white text-sm rounded-lg py-1 outline-none">
+                                <span class="text-xs text-slate-400 font-bold">cm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column: Video & Dashboard -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Camera Viewport -->
+            <div class="glass-panel p-3 rounded-2xl relative shadow-2xl overflow-hidden">
+                <div id="loadingOverlay" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/95 rounded-xl">
+                    <div class="w-12 h-12 border-4 border-sky-500/30 border-t-sky-400 rounded-full animate-spin mb-4"></div>
+                    <p class="font-bold text-white">Initializing Vision AI...</p>
+                </div>
+
+                <!-- Foul Alert -->
+                <div id="foulBanner" class="hidden absolute top-4 left-4 right-4 z-20 bg-red-600/90 text-white px-4 py-3 rounded-xl font-black text-center text-sm tracking-wide shadow-lg border border-red-400 animate-pulse">
+                    ⚠️ FOUL DETECTED: KNEE BENT (<span id="foulAngleVal">160</span>°). STRAIGHTEN LEGS!
+                </div>
+
+                <!-- 2-Second Hold Progress Bar -->
+                <div id="holdProgressCard" class="hidden absolute bottom-4 left-4 right-4 z-20 bg-slate-900/90 p-3 rounded-xl border border-sky-500/50 shadow-xl">
+                    <div class="flex justify-between items-center text-xs font-black text-sky-400 mb-2">
+                        <span>HOLDING POSITION (2.0 SEC RULE)</span>
+                        <span id="holdTimerText" class="font-mono text-white">0.0s / 2.0s</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden">
+                        <div id="holdProgressBar" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full w-0 transition-all duration-75"></div>
+                    </div>
+                </div>
+
+                <div class="video-container rounded-xl">
+                    <video id="videoElement" playsinline autoplay muted></video>
+                    <canvas id="canvasElement"></canvas>
+                </div>
+            </div>
+
+            <!-- Live Metrics HUD -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Current Reach</div>
+                    <div class="flex items-baseline justify-center gap-1">
+                        <span id="currentDistDisplay" class="text-3xl sm:text-4xl font-black text-sky-400 font-mono">0</span>
+                        <span class="text-xs text-slate-400">cm</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Peak Score</div>
+                    <div class="flex items-baseline justify-center gap-1">
+                        <span id="peakDistDisplay" class="text-3xl sm:text-4xl font-black text-emerald-400 font-mono">0</span>
+                        <span class="text-xs text-slate-400">cm</span>
+                    </div>
+                </div>
+
+                <div id="kneeCard" class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center transition-colors">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Knee Angle</div>
+                    <div class="flex items-baseline justify-center gap-1">
+                        <span id="kneeAngleDisplay" class="text-3xl sm:text-4xl font-black text-amber-400 font-mono">180</span>
+                        <span class="text-xs text-slate-400">°</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Grade</div>
+                    <div id="gradeDisplay" class="text-3xl sm:text-4xl font-black text-slate-500">-</div>
+                </div>
+            </div>
+
+            <!-- Status & Action Bar -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="text-xs font-bold text-slate-400 uppercase">Status:</div>
+                    <div id="stateBadge" class="px-4 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 font-black text-sm uppercase">
+                        WAITING
+                    </div>
+                </div>
+                <button id="resetBtn" class="w-full sm:w-auto px-6 py-3 rounded-xl font-black text-white bg-slate-700 hover:bg-slate-600 border border-slate-600 transition shadow-lg">
+                    🔄 Reset / Next Student
+                </button>
+            </div>
+        </div>
+    </main>
 
     <script>
-        // --- NAPFA SCORING MATRIX (Sit and Reach in CM) ---
-        const napfaScoring = {
+        // Official NAPFA Sit & Reach Standards Table (cm)
+        const NAPFA_STANDARDS = {
             "M": {
-                "13": { A: 42, B: 38, C: 34, D: 30, E: 26 },
-                "14": { A: 44, B: 40, C: 36, D: 32, E: 28 },
-                "15": { A: 46, B: 42, C: 38, D: 34, E: 30 },
-                "16": { A: 48, B: 44, C: 40, D: 36, E: 32 }
+                "10": { A: 35, B: 32, C: 28, D: 23, E: 18 },
+                "11": { A: 37, B: 34, C: 30, D: 25, E: 20 },
+                "12": { A: 39, B: 36, C: 32, D: 28, E: 23 },
+                "13": { A: 41, B: 38, C: 34, D: 30, E: 25 },
+                "14": { A: 43, B: 40, C: 36, D: 32, E: 27 },
+                "15": { A: 45, B: 42, C: 38, D: 34, E: 29 },
+                "16": { A: 47, B: 44, C: 40, D: 36, E: 31 },
+                "17": { A: 48, B: 45, C: 41, D: 37, E: 32 },
+                "18": { A: 50, B: 44, C: 37, D: 30, E: 23 }
             },
             "F": {
-                "13": { A: 44, B: 40, C: 36, D: 32, E: 28 },
-                "14": { A: 46, B: 42, C: 38, D: 34, E: 30 },
-                "15": { A: 47, B: 43, C: 39, D: 35, E: 31 },
-                "16": { A: 48, B: 44, C: 40, D: 36, E: 32 }
+                "10": { A: 35, B: 32, C: 28, D: 23, E: 18 },
+                "11": { A: 37, B: 34, C: 30, D: 25, E: 20 },
+                "12": { A: 39, B: 37, C: 34, D: 30, E: 25 },
+                "13": { A: 41, B: 39, C: 36, D: 32, E: 27 },
+                "14": { A: 43, B: 41, C: 38, D: 34, E: 29 },
+                "15": { A: 45, B: 43, C: 39, D: 35, E: 30 },
+                "16": { A: 46, B: 44, C: 40, D: 36, E: 31 },
+                "17": { A: 46, B: 44, C: 40, D: 36, E: 32 },
+                "18": { A: 48, B: 43, C: 36, D: 29, E: 22 }
             }
         };
 
-        // --- DOM Elements ---
-        const genderSelect = document.getElementById('genderSelect');
-        const ageSelect = document.getElementById('ageSelect');
-        const targetBoard = document.getElementById('targetBoard');
-        
-        const startLineCmInput = document.getElementById('startLineCm');
-        const endLineCmInput = document.getElementById('endLineCm');
-        const startSlider = document.getElementById('startSlider');
-        const endSlider = document.getElementById('endSlider');
-
-        const currentReachDisplay = document.getElementById('currentReachDisplay');
-        const holdTimerDisplay = document.getElementById('holdTimerDisplay');
-        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
-        const foulWarning = document.getElementById('foulWarning');
-        const statusMsg = document.getElementById('statusMsg');
-        const startBtn = document.getElementById('startBtn');
-
-        const videoElement = document.getElementById('videoElement');
-        const canvasElement = document.getElementById('canvasElement');
-        const canvasCtx = canvasElement.getContext('2d');
-        const loadingText = document.getElementById('loadingText');
-
-        // --- App State ---
-        let isTesting = false;
-        let testCompleted = false;
-        let currentMaxReach = 0;
-        let holdStartTime = 0;
-        let bestScore = 0;
-        const HOLD_DURATION = 2000; // 2 seconds
-
-        // Update target board when age/gender changes
-        function updateTargetBoard() {
-            const matrix = napfaScoring[genderSelect.value][ageSelect.value];
-            targetBoard.innerHTML = `
-                <span class="text-green-700">A: ${matrix.A}+</span> <span class="text-gray-300">|</span>
-                <span class="text-blue-700">B: ${matrix.B}+</span> <span class="text-gray-300">|</span>
-                <span class="text-yellow-600">C: ${matrix.C}+</span> <span class="text-gray-300">|</span>
-                <span class="text-orange-600">D: ${matrix.D}+</span> <span class="text-gray-300">|</span>
-                <span class="text-red-600">E: ${matrix.E}+</span>
-            `;
-        }
-        genderSelect.addEventListener('change', updateTargetBoard);
-        ageSelect.addEventListener('change', updateTargetBoard);
-        updateTargetBoard(); // Init
-
-        // --- Controls ---
-        startBtn.addEventListener('click', () => {
-            if(isTesting) return;
-            isTesting = true;
-            testCompleted = false;
-            bestScore = 0;
-            currentMaxReach = 0;
-            holdStartTime = 0;
-            finalScoreDisplay.innerText = "-";
-            startBtn.disabled = true;
-            statusMsg.innerText = "Test Started! Push forward slowly and hold for 2 seconds.";
-            statusMsg.className = "text-center mt-4 text-lg font-semibold text-green-600";
-        });
-
-        document.getElementById('resetBtn').addEventListener('click', () => {
-            isTesting = false;
-            testCompleted = false;
-            startBtn.disabled = false;
-            currentReachDisplay.innerText = "0.0";
-            holdTimerDisplay.innerText = "Wait";
-            finalScoreDisplay.innerText = "-";
-            statusMsg.innerText = "Align the physical lines using the sliders, then click Start.";
-            statusMsg.className = "text-center mt-4 text-lg font-semibold text-gray-500";
-            foulWarning.classList.add('hidden');
-        });
-
-        // --- Math & Logic ---
-        function calculateAngle(a, b, c) {
-            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
-        }
-
-        // Convert pixel X coordinate to CM using linear interpolation
-        function pixelsToCm(pixelX, canvasWidth) {
-            const startX = (startSlider.value / 100) * canvasWidth;
-            const endX = (endSlider.value / 100) * canvasWidth;
-            const startCm = parseFloat(startLineCmInput.value);
-            const endCm = parseFloat(endLineCmInput.value);
-
-            if (startX === endX) return 0; 
+        // Application State
+        let appState = {
+            status: "WAITING", // WAITING, REACHING, HOLDING, COMPLETED, FOUL
+            audioEnabled: true,
             
-            const ratio = (pixelX - startX) / (endX - startX);
-            const cm = startCm + (ratio * (endCm - startCm));
-            return cm;
+            // Calibration Mapping
+            startPct: 25,
+            endPct: 75,
+            startPhysicalCm: 0,
+            endPhysicalCm: 50,
+            
+            // AI Configuration
+            minKneeAngle: 165,
+            selectedCameraId: "",
+            
+            // Active Metrics
+            currentReachCm: 0,
+            peakReachCm: 0,
+            currentKneeAngle: 180,
+            isFoul: false,
+            
+            // Timer logic
+            holdStartTime: null,
+            targetHoldTime: 2.0 // seconds
+        };
+
+        let currentStream = null;
+        let poseEngine = null;
+        let lastSpokenStatus = "";
+
+        const DOM = {
+            gender: document.getElementById('genderSelect'),
+            age: document.getElementById('ageSelect'),
+            camera: document.getElementById('cameraSelect'),
+            audioBtn: document.getElementById('toggleAudioBtn'),
+            audioText: document.getElementById('audioText'),
+            
+            startSlider: document.getElementById('startLineSlider'),
+            endSlider: document.getElementById('endLineSlider'),
+            startVal: document.getElementById('startLineVal'),
+            endVal: document.getElementById('endLineVal'),
+            startPhysicalInput: document.getElementById('startPhysicalInput'),
+            endPhysicalInput: document.getElementById('endPhysicalInput'),
+            
+            targetLabel: document.getElementById('targetLabel'),
+            targetA: document.getElementById('targetA'),
+            targetB: document.getElementById('targetB'),
+            targetC: document.getElementById('targetC'),
+            targetD: document.getElementById('targetD'),
+            targetE: document.getElementById('targetE'),
+
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            
+            foulBanner: document.getElementById('foulBanner'),
+            foulAngleVal: document.getElementById('foulAngleVal'),
+            holdProgressCard: document.getElementById('holdProgressCard'),
+            holdTimerText: document.getElementById('holdTimerText'),
+            holdProgressBar: document.getElementById('holdProgressBar'),
+
+            currentDistDisplay: document.getElementById('currentDistDisplay'),
+            peakDistDisplay: document.getElementById('peakDistDisplay'),
+            kneeAngleDisplay: document.getElementById('kneeAngleDisplay'),
+            kneeCard: document.getElementById('kneeCard'),
+            gradeDisplay: document.getElementById('gradeDisplay'),
+            stateBadge: document.getElementById('stateBadge'),
+            resetBtn: document.getElementById('resetBtn')
+        };
+        const ctx = DOM.canvas.getContext('2d');
+
+        function speak(text, priority = false) {
+            if (!appState.audioEnabled) return;
+            try {
+                if (priority) window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.05;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.warn("Speech API issue", e);
+            }
         }
 
-        function calculateGrade(scoreCm) {
-            const matrix = napfaScoring[genderSelect.value][ageSelect.value];
-            if (scoreCm >= matrix.A) return "A";
-            if (scoreCm >= matrix.B) return "B";
-            if (scoreCm >= matrix.C) return "C";
-            if (scoreCm >= matrix.D) return "D";
-            if (scoreCm >= matrix.E) return "E";
-            return "Fail";
+        function updateStandardsBoard() {
+            const g = DOM.gender.value;
+            const a = DOM.age.value;
+            let targets = NAPFA_STANDARDS[g]?.[a] || { A: "-", B: "-", C: "-", D: "-", E: "-" };
+
+            DOM.targetLabel.innerText = `${g} ${a} Y/O`;
+            DOM.targetA.innerText = targets.A;
+            DOM.targetB.innerText = targets.B;
+            DOM.targetC.innerText = targets.C;
+            DOM.targetD.innerText = targets.D;
+            DOM.targetE.innerText = targets.E;
         }
 
-        // --- MediaPipe Processing ---
-        function onResults(results) {
-            if(loadingText.style.display !== 'none') loadingText.style.display = 'none';
+        function computeGrade(reachCm) {
+            const g = DOM.gender.value;
+            const a = DOM.age.value;
+            let t = NAPFA_STANDARDS[g]?.[a] || { A: 45, B: 40, C: 35, D: 30, E: 25 };
 
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            if (reachCm >= t.A) return { grade: "A", color: "text-emerald-400" };
+            if (reachCm >= t.B) return { grade: "B", color: "text-teal-400" };
+            if (reachCm >= t.C) return { grade: "C", color: "text-sky-400" };
+            if (reachCm >= t.D) return { grade: "D", color: "text-amber-400" };
+            if (reachCm >= t.E) return { grade: "E", color: "text-orange-400" };
+            return { grade: "F", color: "text-red-500" };
+        }
 
-            const w = canvasElement.width;
-            const h = canvasElement.height;
+        function calculateAngle(p1, p2, p3) {
+            const radians = Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
+            let angle = Math.abs((radians * 180.0) / Math.PI);
+            return Math.round(angle > 180.0 ? 360.0 - angle : angle);
+        }
 
-            // Draw Calibration Lines
-            const startLineX = (startSlider.value / 100) * w;
-            const endLineX = (endSlider.value / 100) * w;
-            const startCm = parseFloat(startLineCmInput.value);
-            const endCm = parseFloat(endLineCmInput.value);
+        function calculateReachCm(fingerNormalizedX) {
+            const startNorm = appState.startPct / 100.0;
+            const endNorm = appState.endPct / 100.0;
+            
+            // Assume reaching right-ward (feet left)
+            const physicalDelta = appState.endPhysicalCm - appState.startPhysicalCm;
+            const normDelta = endNorm - startNorm;
+            
+            if (normDelta <= 0) return 0;
+            
+            // Linear mapping
+            const ratio = (fingerNormalizedX - startNorm) / normDelta;
+            const calculatedCm = appState.startPhysicalCm + (ratio * physicalDelta);
+            
+            return Math.round(calculatedCm);
+        }
 
-            canvasCtx.beginPath(); canvasCtx.moveTo(startLineX, 0); canvasCtx.lineTo(startLineX, h);
-            canvasCtx.strokeStyle = "red"; canvasCtx.lineWidth = 3; canvasCtx.stroke();
-            canvasCtx.fillStyle = "red"; canvasCtx.font = "bold 16px Arial";
-            canvasCtx.fillText(`Start: ${startCm} cm`, startLineX + 10, 25);
+        function changeState(text, styleClasses) {
+            appState.status = text;
+            DOM.stateBadge.innerText = text;
+            DOM.stateBadge.className = `px-4 py-1.5 rounded-lg font-black text-sm uppercase tracking-wide border ${styleClasses}`;
+        }
 
-            canvasCtx.beginPath(); canvasCtx.moveTo(endLineX, 0); canvasCtx.lineTo(endLineX, h);
-            canvasCtx.strokeStyle = "lime"; canvasCtx.lineWidth = 3; canvasCtx.stroke();
-            canvasCtx.fillStyle = "lime"; canvasCtx.fillText(`End: ${endCm} cm`, endLineX + 10, 25);
+        function completeHoldAttempt() {
+            appState.status = "COMPLETED";
+            DOM.holdProgressCard.classList.add('hidden');
+            changeState("COMPLETED", "bg-emerald-500/20 text-emerald-400 border-emerald-500/40");
 
-            if (results.poseLandmarks && isTesting && !testCompleted) {
-                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
-                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 1});
+            const result = computeGrade(appState.peakReachCm);
+            DOM.gradeDisplay.innerText = result.grade;
+            DOM.gradeDisplay.className = `text-3xl sm:text-4xl font-black ${result.color}`;
 
-                const landmarks = results.poseLandmarks;
+            speak(`Attempt complete. Scored ${appState.peakReachCm} centimeters. Grade ${result.grade}.`, true);
+        }
+
+        function processPose(landmarks) {
+            if (appState.status === "COMPLETED") return;
+
+            // MediaPipe Landmarks
+            // L-Hip: 23, L-Knee: 25, L-Ankle: 27
+            // R-Hip: 24, R-Knee: 26, R-Ankle: 28
+            // L-Index: 19, R-Index: 20
+            const lHip = landmarks[23], rHip = landmarks[24];
+            const lKnee = landmarks[25], rKnee = landmarks[26];
+            const lAnkle = landmarks[27], rAnkle = landmarks[28];
+            const lFinger = landmarks[19], rFinger = landmarks[20];
+
+            // 1. Calculate Knee Angles (Foul Detection)
+            let lAngle = (lHip && lKnee && lAnkle && lKnee.visibility > 0.4) ? calculateAngle(lHip, lKnee, lAnkle) : 180;
+            let rAngle = (rHip && rKnee && rAnkle && rKnee.visibility > 0.4) ? calculateAngle(rHip, rKnee, rAnkle) : 180;
+            
+            let kneeAngle = Math.min(lAngle, rAngle);
+            appState.currentKneeAngle = kneeAngle;
+            DOM.kneeAngleDisplay.innerText = kneeAngle;
+
+            let isFoul = kneeAngle < appState.minKneeAngle;
+            appState.isFoul = isFoul;
+
+            if (isFoul) {
+                DOM.foulBanner.classList.remove('hidden');
+                DOM.foulAngleVal.innerText = kneeAngle;
+                DOM.kneeCard.classList.add('border-red-500', 'bg-red-900/40');
                 
-                const leftFinger = landmarks[19];
-                const rightFinger = landmarks[20];
-                
-                const furthestFingerX = Math.max(leftFinger.x * w, rightFinger.x * w);
-                let currentCm = pixelsToCm(furthestFingerX, w);
-
-                const hip = landmarks[23];
-                const knee = landmarks[25];
-                const ankle = landmarks[27];
-                const kneeAngle = calculateAngle(hip, knee, ankle);
-                
-                let isFoul = false;
-                if (kneeAngle < 165 && currentCm > startCm) {
-                    isFoul = true;
-                    foulWarning.classList.remove('hidden');
-                } else {
-                    foulWarning.classList.add('hidden');
-                }
-
-                if (!isFoul) {
-                    if (currentCm > startCm) {
-                        currentReachDisplay.innerText = currentCm.toFixed(1);
-                        
-                        const now = Date.now();
-                        
-                        if (currentCm > currentMaxReach + 1.0) { 
-                            currentMaxReach = currentCm;
-                            holdStartTime = now;
-                            holdTimerDisplay.innerText = "Holding";
-                        } else if (currentCm >= currentMaxReach - 1.5) { 
-                            if (holdStartTime > 0) {
-                                let heldFor = now - holdStartTime;
-                                let timeLeft = ((HOLD_DURATION - heldFor) / 1000).toFixed(1);
-                                holdTimerDisplay.innerText = timeLeft + "s";
-
-                                if (heldFor >= HOLD_DURATION) {
-                                    bestScore = currentMaxReach;
-                                    let grade = calculateGrade(bestScore);
-                                    finalScoreDisplay.innerText = `${bestScore.toFixed(1)} (${grade})`;
-                                    testCompleted = true;
-                                    statusMsg.innerText = "Test Complete! Great job.";
-                                    statusMsg.className = "text-center mt-4 text-lg font-semibold text-blue-600";
-                                    holdTimerDisplay.innerText = "LOCKED";
-                                }
-                            }
-                        } else {
-                            holdStartTime = 0;
-                            currentMaxReach = currentCm; 
-                            holdTimerDisplay.innerText = "Dropped";
-                        }
+                if (appState.status === "HOLDING" || appState.status === "REACHING") {
+                    appState.holdStartTime = null;
+                    changeState("FOUL", "bg-red-500/20 text-red-400 border-red-500/40");
+                    DOM.holdProgressCard.classList.add('hidden');
+                    if (lastSpokenStatus !== "FOUL") {
+                        speak("Foul! Straighten your knees!", true);
+                        lastSpokenStatus = "FOUL";
                     }
-                } else {
-                    holdStartTime = 0;
-                    holdTimerDisplay.innerText = "FOUL";
+                }
+                return; // Stop processing distance if foul
+            } else {
+                DOM.foulBanner.classList.add('hidden');
+                DOM.kneeCard.classList.remove('border-red-500', 'bg-red-900/40');
+            }
+
+            // 2. Calculate Reach Distance
+            let reachX = Math.max(
+                (lFinger && lFinger.visibility > 0.4) ? lFinger.x : 0,
+                (rFinger && rFinger.visibility > 0.4) ? rFinger.x : 0
+            );
+
+            if (reachX === 0) return; // No fingers visible
+
+            let reachCm = calculateReachCm(reachX);
+            appState.currentReachCm = reachCm;
+            DOM.currentDistDisplay.innerText = reachCm;
+
+            // 3. State Machine (Waiting -> Reaching -> Holding -> Completed)
+            if (appState.status === "WAITING" || appState.status === "FOUL") {
+                if (reachCm >= appState.startPhysicalCm - 5) {
+                    changeState("READY", "bg-emerald-500/20 text-emerald-400 border-emerald-500/40");
+                    if (lastSpokenStatus !== "READY") {
+                        speak("Ready. Slowly reach forward and hold.");
+                        lastSpokenStatus = "READY";
+                    }
                 }
             }
-            canvasCtx.restore();
+            else if (appState.status === "READY" || appState.status === "REACHING") {
+                // If they've reached past a small threshold
+                if (reachCm > appState.startPhysicalCm + 5) {
+                    changeState("REACHING", "bg-sky-500/20 text-sky-400 border-sky-500/40");
+                    
+                    // Trigger hold timer logic if reach is significant
+                    if (reachCm > appState.startPhysicalCm + 15) {
+                        appState.status = "HOLDING";
+                        appState.holdStartTime = performance.now();
+                        changeState("HOLDING", "bg-indigo-500/20 text-indigo-400 border-indigo-500/40");
+                        if (lastSpokenStatus !== "HOLDING") {
+                            speak("Hold it right there.");
+                            lastSpokenStatus = "HOLDING";
+                        }
+                    }
+                }
+            }
+            else if (appState.status === "HOLDING") {
+                if (!appState.holdStartTime) appState.holdStartTime = performance.now();
+                
+                let elapsed = (performance.now() - appState.holdStartTime) / 1000.0;
+                
+                // Track peak score
+                if (reachCm > appState.peakReachCm) {
+                    appState.peakReachCm = reachCm;
+                    DOM.peakDistDisplay.innerText = appState.peakReachCm;
+                }
+
+                // Update UI Timer
+                DOM.holdProgressCard.classList.remove('hidden');
+                DOM.holdTimerText.innerText = `${elapsed.toFixed(1)}s / 2.0s`;
+                let pct = Math.min((elapsed / appState.targetHoldTime) * 100, 100);
+                DOM.holdProgressBar.style.width = `${pct}%`;
+
+                if (elapsed >= appState.targetHoldTime) {
+                    completeHoldAttempt();
+                }
+            }
         }
 
-        // --- Initialization ---
-        const pose = new Pose({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-        }});
+        async function startCamera() {
+            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            const constraints = {
+                video: appState.selectedCameraId 
+                    ? { deviceId: { exact: appState.selectedCameraId }, width: 1280, height: 720 }
+                    : { facingMode: 'environment', width: 1280, height: 720 }
+            };
 
-        pose.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                DOM.video.srcObject = currentStream;
+                DOM.video.onloadedmetadata = () => {
+                    DOM.canvas.width = DOM.video.videoWidth;
+                    DOM.canvas.height = DOM.video.videoHeight;
+                };
+            } catch (err) {
+                console.error("Camera access failed", err);
+            }
+        }
+
+        async function getCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                DOM.camera.innerHTML = "";
+                videoDevices.forEach((d, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.text = d.label || `Camera ${i + 1}`;
+                    DOM.camera.appendChild(opt);
+                });
+                if (videoDevices.length > 0 && !appState.selectedCameraId) {
+                    appState.selectedCameraId = videoDevices[0].deviceId;
+                    startCamera();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        poseEngine = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        poseEngine.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+        poseEngine.onResults((results) => {
+            if (!DOM.loadingOverlay.classList.contains('hidden')) {
+                DOM.loadingOverlay.classList.add('hidden');
+                getCameras();
+            }
+
+            ctx.save();
+            ctx.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+            ctx.drawImage(results.image, 0, 0, DOM.canvas.width, DOM.canvas.height);
+
+            // Draw Calibration Lines
+            const startX = DOM.canvas.width * (appState.startPct / 100);
+            const endX = DOM.canvas.width * (appState.endPct / 100);
+
+            // Start Line
+            ctx.beginPath();
+            ctx.moveTo(startX, 0);
+            ctx.lineTo(startX, DOM.canvas.height);
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.9)'; // rose-500
+            ctx.lineWidth = 4;
+            ctx.setLineDash([8, 8]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = '#f43f5e';
+            ctx.font = 'bold 18px Inter';
+            ctx.fillText(`${appState.startPhysicalCm}cm (Start)`, startX + 10, 30);
+
+            // End Line
+            ctx.beginPath();
+            ctx.moveTo(endX, 0);
+            ctx.lineTo(endX, DOM.canvas.height);
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)'; // emerald-500
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#10b981';
+            ctx.fillText(`${appState.endPhysicalCm}cm (End)`, endX - 100, 30);
+
+            // Draw Skeleton
+            if (results.poseLandmarks) {
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: 'rgba(56, 189, 248, 0.4)', lineWidth: 3 });
+                
+                // Highlights
+                const landmarks = results.poseLandmarks;
+                const points = [landmarks[19], landmarks[20], landmarks[25], landmarks[26]];
+                
+                points.forEach((p, index) => {
+                    if (p && p.visibility > 0.5) {
+                        ctx.beginPath();
+                        ctx.arc(p.x * DOM.canvas.width, p.y * DOM.canvas.height, 8, 0, 2 * Math.PI);
+                        ctx.fillStyle = (index >= 2 && appState.isFoul) ? '#ef4444' : '#0ea5e9';
+                        ctx.fill();
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = '#fff';
+                        ctx.stroke();
+                    }
+                });
+
+                processPose(results.poseLandmarks);
+            }
+            ctx.restore();
         });
 
-        pose.onResults(onResults);
+        async function renderLoop() {
+            if (DOM.video.readyState >= 2) await poseEngine.send({ image: DOM.video });
+            requestAnimationFrame(renderLoop);
+        }
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await pose.send({image: videoElement});
-            },
-            width: 640,
-            height: 480
-        });
+        DOM.gender.onchange = updateStandardsBoard;
+        DOM.age.onchange = updateStandardsBoard;
+        
+        DOM.camera.onchange = (e) => {
+            appState.selectedCameraId = e.target.value;
+            startCamera();
+        };
 
-        camera.start();
+        DOM.audioBtn.onclick = () => {
+            appState.audioEnabled = !appState.audioEnabled;
+            DOM.audioText.innerText = `Audio: ${appState.audioEnabled ? 'ON' : 'OFF'}`;
+            DOM.audioBtn.classList.toggle('text-sky-400', appState.audioEnabled);
+            DOM.audioBtn.classList.toggle('text-slate-500', !appState.audioEnabled);
+            if (appState.audioEnabled) speak("Audio enabled");
+        };
+
+        // Inputs & Sliders
+        DOM.startSlider.oninput = (e) => {
+            appState.startPct = parseInt(e.target.value);
+            DOM.startVal.innerText = `${appState.startPct}%`;
+        };
+        DOM.endSlider.oninput = (e) => {
+            appState.endPct = parseInt(e.target.value);
+            DOM.endVal.innerText = `${appState.endPct}%`;
+        };
+        DOM.startPhysicalInput.onchange = (e) => { appState.startPhysicalCm = parseInt(e.target.value) || 0; };
+        DOM.endPhysicalInput.onchange = (e) => { appState.endPhysicalCm = parseInt(e.target.value) || 50; };
+
+        DOM.resetBtn.onclick = () => {
+            appState.status = "WAITING";
+            appState.peakReachCm = 0;
+            appState.currentReachCm = 0;
+            appState.isFoul = false;
+            appState.holdStartTime = null;
+            lastSpokenStatus = "";
+
+            changeState("WAITING", "bg-amber-500/20 text-amber-400 border-amber-500/40");
+            DOM.currentDistDisplay.innerText = "0";
+            DOM.peakDistDisplay.innerText = "0";
+            DOM.gradeDisplay.innerText = "-";
+            DOM.gradeDisplay.className = "text-3xl sm:text-4xl font-black text-slate-500";
+            DOM.foulBanner.classList.add('hidden');
+            DOM.holdProgressCard.classList.add('hidden');
+            
+            speak("Ready for the next student", true);
+        };
+
+        window.onload = () => {
+            updateStandardsBoard();
+            startCamera().then(renderLoop);
+        };
     </script>
 </body>
 </html>
