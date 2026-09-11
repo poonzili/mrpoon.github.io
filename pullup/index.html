@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NAPFA Pull-Up AI Scorer</title>
+    <title>NAPFA Pull-Up AI Scorer (Dark Mode)</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Libraries -->
@@ -16,26 +16,26 @@
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 flex flex-col items-center p-4">
+<body class="bg-gray-900 font-sans text-gray-100 flex flex-col items-center p-4 min-h-screen">
 
-    <div class="max-w-3xl w-full bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold text-center text-blue-600 mb-2">NAPFA Pull-Up AI Scorer</h1>
-        <p id="exerciseTypeLabel" class="text-center font-semibold text-gray-600 mb-4 bg-yellow-100 py-1 rounded">
+    <div class="max-w-3xl w-full bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+        <h1 class="text-3xl font-bold text-center text-blue-400 mb-2">NAPFA Pull-Up AI Scorer</h1>
+        <p id="exerciseTypeLabel" class="text-center font-semibold text-yellow-200 mb-4 bg-yellow-900/50 py-1.5 rounded border border-yellow-700/50">
             Exercise: Inclined Pull-Ups (30 Seconds)
         </p>
 
         <!-- Settings Row -->
-        <div class="flex flex-wrap justify-between gap-4 mb-4 bg-gray-50 p-4 rounded-md">
+        <div class="flex flex-wrap justify-between gap-4 mb-4 bg-gray-700 p-4 rounded-lg border border-gray-600">
             <div>
-                <label class="font-semibold block mb-1">Gender:</label>
-                <select id="genderSelect" class="border p-2 rounded">
+                <label class="font-semibold block mb-1 text-gray-300">Gender:</label>
+                <select id="genderSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="M">Male</option>
                     <option value="F" selected>Female</option>
                 </select>
             </div>
             <div>
-                <label class="font-semibold block mb-1">Age:</label>
-                <select id="ageSelect" class="border p-2 rounded">
+                <label class="font-semibold block mb-1 text-gray-300">Age:</label>
+                <select id="ageSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="13">13</option>
                     <option value="14">14</option>
                     <option value="15">15</option>
@@ -43,77 +43,73 @@
                 </select>
             </div>
             <div class="flex items-end">
-                <button id="toggleAudio" class="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600">
+                <button id="toggleAudio" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors">
                     🔊 Audio On
                 </button>
             </div>
         </div>
 
         <!-- Target Goals Scoreboard -->
-        <div class="mb-6 border-2 border-blue-200 bg-blue-50 p-4 rounded-md shadow-sm">
-            <h2 class="text-sm uppercase tracking-wide font-bold text-center text-blue-800 mb-2">Target Reps Needed</h2>
-            <div id="targetScores" class="flex justify-around text-lg font-bold">
-                <div class="text-green-600 flex flex-col items-center"><span class="text-xs text-gray-500">Grade A</span> <span id="targetA">-</span></div>
-                <div class="text-blue-500 flex flex-col items-center"><span class="text-xs text-gray-500">Grade B</span> <span id="targetB">-</span></div>
-                <div class="text-yellow-500 flex flex-col items-center"><span class="text-xs text-gray-500">Grade C</span> <span id="targetC">-</span></div>
-                <div class="text-orange-500 flex flex-col items-center"><span class="text-xs text-gray-500">Grade D</span> <span id="targetD">-</span></div>
-                <div class="text-red-500 flex flex-col items-center"><span class="text-xs text-gray-500">Grade E</span> <span id="targetE">-</span></div>
+        <div class="mb-6 border border-gray-600 bg-gray-700/50 p-4 rounded-lg shadow-inner">
+            <h2 class="text-sm uppercase tracking-wider font-bold text-center text-blue-300 mb-3">Target Reps Needed</h2>
+            <div id="targetScores" class="flex justify-around text-xl font-bold">
+                <div class="text-green-400 flex flex-col items-center"><span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Grade A</span> <span id="targetA">-</span></div>
+                <div class="text-blue-400 flex flex-col items-center"><span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Grade B</span> <span id="targetB">-</span></div>
+                <div class="text-yellow-400 flex flex-col items-center"><span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Grade C</span> <span id="targetC">-</span></div>
+                <div class="text-orange-400 flex flex-col items-center"><span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Grade D</span> <span id="targetD">-</span></div>
+                <div class="text-red-400 flex flex-col items-center"><span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Grade E</span> <span id="targetE">-</span></div>
             </div>
         </div>
 
         <!-- Dashboard -->
         <div class="grid grid-cols-3 gap-4 text-center mb-6">
-            <div class="bg-gray-800 text-white p-4 rounded-lg">
-                <div class="text-sm uppercase tracking-wide">Time Left</div>
-                <div id="timeDisplay" class="text-4xl font-bold">30s</div>
+            <div class="bg-gray-900 border border-gray-700 text-white p-4 rounded-lg shadow">
+                <div class="text-sm uppercase tracking-wide text-gray-400 mb-1">Time Left</div>
+                <div id="timeDisplay" class="text-4xl font-mono font-bold text-white">30s</div>
             </div>
-            <div class="bg-blue-600 text-white p-4 rounded-lg">
-                <div class="text-sm uppercase tracking-wide">Reps</div>
-                <div id="repDisplay" class="text-4xl font-bold">0</div>
+            <div class="bg-blue-600 text-white p-4 rounded-lg shadow">
+                <div class="text-sm uppercase tracking-wide text-blue-200 mb-1">Reps</div>
+                <div id="repDisplay" class="text-4xl font-mono font-bold">0</div>
             </div>
-            <div class="bg-green-500 text-white p-4 rounded-lg">
-                <div class="text-sm uppercase tracking-wide">Grade</div>
-                <div id="gradeDisplay" class="text-4xl font-bold">-</div>
+            <div class="bg-green-600 text-white p-4 rounded-lg shadow">
+                <div class="text-sm uppercase tracking-wide text-green-200 mb-1">Grade</div>
+                <div id="gradeDisplay" class="text-4xl font-mono font-bold">-</div>
             </div>
         </div>
 
         <!-- Camera Area -->
-        <div class="video-container bg-black flex justify-center items-center shadow-inner relative">
-            <div id="loadingText" class="absolute text-white z-0">Loading AI Camera...</div>
+        <div class="video-container bg-black flex justify-center items-center rounded-lg overflow-hidden shadow-inner relative border border-gray-700">
+            <div id="loadingText" class="absolute text-gray-300 z-0 animate-pulse font-semibold">Loading AI Camera...</div>
             <video id="videoElement" playsinline autoplay muted></video>
             <canvas id="canvasElement"></canvas>
         </div>
 
         <!-- Controls -->
         <div class="flex justify-center gap-4 mt-6">
-            <button id="startBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-green-700 disabled:opacity-50">
+            <button id="startBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-green-500 disabled:opacity-50 transition-colors">
                 Start 30-Sec Test
             </button>
-            <button id="resetBtn" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-red-600">
+            <button id="resetBtn" class="bg-red-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-red-500 transition-colors">
                 Reset
             </button>
         </div>
         
         <!-- Status Indicator -->
-        <p id="formStatus" class="text-center mt-4 text-lg font-semibold text-gray-500">
+        <p id="formStatus" class="text-center mt-6 text-lg font-semibold text-gray-400">
             Position the camera to see your upper body.
         </p>
     </div>
 
     <script>
         // --- NAPFA SCORING DATA (Standard & Inclined Pull-Ups) ---
-        // Format: { A, B, C, D, E } reps required
         const napfaScoring = {
             "M": {
-                // Males < 15 do Inclined Pullups
                 "13": { type: "Inclined", A: 25, B: 22, C: 17, D: 12, E: 7 },
                 "14": { type: "Inclined", A: 26, B: 23, C: 18, D: 13, E: 8 },
-                // Males >= 15 do Full Pull-ups
                 "15": { type: "Full", A: 8, B: 6, C: 5, D: 3, E: 1 },
                 "16": { type: "Full", A: 9, B: 7, C: 5, D: 3, E: 1 }
             },
             "F": {
-                // Females of all ages do Inclined Pullups
                 "13": { type: "Inclined", A: 17, B: 13, C: 10, D: 7, E: 3 },
                 "14": { type: "Inclined", A: 17, B: 14, C: 10, D: 7, E: 3 },
                 "15": { type: "Inclined", A: 17, B: 14, C: 10, D: 7, E: 3 },
@@ -164,11 +160,9 @@
             document.getElementById('targetD').innerText = `${data.D}-${data.C - 1}`;
             document.getElementById('targetE').innerText = `${data.E}-${data.D - 1}`;
             
-            // Recalculate current grade immediately if test is active
             updateNapfaScore();
         }
 
-        // Listeners for dropdowns
         genderSelect.addEventListener('change', updateTargetScoreboard);
         ageSelect.addEventListener('change', updateTargetScoreboard);
 
@@ -185,8 +179,8 @@
             audioEnabled = !audioEnabled;
             e.target.innerText = audioEnabled ? "🔊 Audio On" : "🔇 Audio Off";
             e.target.className = audioEnabled 
-                ? "bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600" 
-                : "bg-gray-400 text-white px-4 py-2 rounded shadow hover:bg-gray-500";
+                ? "bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors" 
+                : "bg-gray-600 text-white px-4 py-2 rounded shadow hover:bg-gray-500 transition-colors";
         });
 
         // --- TIMER & GRADING LOGIC ---
@@ -194,12 +188,12 @@
             if (isTesting) return;
             isTesting = true;
             reps = 0;
-            timeLeft = 30; // 30 second limit for pull-ups
+            timeLeft = 30; 
             currentGrade = "-";
             updateDisplays();
             speak("Ready, Set, Go!");
             formStatus.innerText = "Test Started! Pull!";
-            formStatus.className = "text-center mt-4 text-lg font-semibold text-green-600";
+            formStatus.className = "text-center mt-6 text-lg font-bold text-green-400";
             startBtn.disabled = true;
 
             timerInterval = setInterval(() => {
@@ -220,7 +214,7 @@
             currentGrade = "-";
             updateDisplays();
             formStatus.innerText = "Position the camera to see your upper body.";
-            formStatus.className = "text-center mt-4 text-lg font-semibold text-gray-500";
+            formStatus.className = "text-center mt-6 text-lg font-semibold text-gray-400";
         });
 
         function endTest(manual = false) {
@@ -230,7 +224,7 @@
             if (!manual) {
                 speak(`Time's up! You did ${reps} reps. Grade ${currentGrade}.`);
                 formStatus.innerText = `Test Over! Total Reps: ${reps}`;
-                formStatus.className = "text-center mt-4 text-lg font-semibold text-blue-600";
+                formStatus.className = "text-center mt-6 text-lg font-bold text-blue-400";
             }
         }
 
@@ -277,7 +271,6 @@
             if (shoulder.visibility > 0.5 && elbow.visibility > 0.5 && wrist.visibility > 0.5) {
                 
                 if (currentExercise === "Full") {
-                    // Standard Pull-Up Logic: Chin/Nose crosses wrist Y-axis
                     const armsExtended = calculateAngle(shoulder, elbow, wrist) > 150;
                     const chinOverBar = nose.y < wrist.y; 
 
@@ -291,7 +284,6 @@
                     }
                 } 
                 else {
-                    // Inclined Pull-Up Logic: Elbow angle breaks 90 degrees
                     const elbowAngle = calculateAngle(shoulder, elbow, wrist);
                     
                     if (elbowAngle > 150) pullupState = "down";
