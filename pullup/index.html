@@ -1,0 +1,560 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPFA Pull-Up AI Scorer</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75); /* Slate 800 */
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border-radius: 1rem;
+            overflow: hidden;
+            background-color: #000;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+        video {
+            display: none; /* Hidden, we draw to canvas */
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror by default */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 sm:p-6 lg:items-center">
+
+    <header class="w-full max-w-5xl mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 glass-card p-5 rounded-2xl">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl shadow-lg text-white">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-blue-400">
+                        NAPFA Pull-Up AI Scorer
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-400 font-medium">Auto-Tracking for Pull-Ups & Inclined Pull-Ups</p>
+                </div>
+            </div>
+            <button id="toggleAudioBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition flex items-center gap-2 text-indigo-400">
+                <span id="audioIcon">🔊</span> <span id="audioText">Voice: ON</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+        
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            <section class="glass-card p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Test Configuration</h2>
+                
+                <div class="space-y-4 text-sm font-semibold text-slate-300">
+                    <!-- Gender -->
+                    <div>
+                        <label class="block mb-2">Gender</label>
+                        <select id="genderSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-indigo-500">
+                            <option value="M" selected>Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+
+                    <!-- Age -->
+                    <div>
+                        <label class="block mb-2">Age</label>
+                        <select id="ageSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-indigo-500">
+                            <option value="13">13 Years Old</option>
+                            <option value="14">14 Years Old</option>
+                            <option value="15">15 Years Old</option>
+                            <option value="16" selected>16 Years Old</option>
+                            <option value="17">17 Years Old</option>
+                            <option value="18">18+ Years Old</option>
+                        </select>
+                    </div>
+
+                    <!-- Exercise Type -->
+                    <div>
+                        <label class="block mb-2 text-indigo-400">Exercise Type</label>
+                        <select id="exerciseSelect" class="w-full bg-slate-900 border border-indigo-500/50 text-indigo-300 rounded-xl p-3 outline-none focus:border-indigo-500">
+                            <option value="pullup">Standard Pull-Up</option>
+                            <option value="inclined">Inclined Pull-Up</option>
+                        </select>
+                        <p class="text-[10px] text-slate-500 mt-1">*Auto-selects based on Age/Gender</p>
+                    </div>
+
+                    <!-- Camera Select -->
+                    <div>
+                        <label class="block mb-2">Camera Output</label>
+                        <select id="cameraSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-indigo-500">
+                            <option value="">Loading cameras...</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Status Indicator -->
+            <section class="glass-card p-5 rounded-2xl text-center flex flex-col items-center">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2">Live AI State</h2>
+                <div id="bodyStateDisplay" class="px-6 py-2 rounded-lg bg-slate-900 border border-slate-700 font-black text-slate-500 w-full mb-2">
+                    SEARCHING...
+                </div>
+                <p id="jointInfo" class="text-xs text-slate-400 font-mono">Elbow: 0° | Nose: 0</p>
+            </section>
+        </div>
+
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <div class="glass-card p-3 rounded-2xl relative shadow-2xl">
+                <div id="loadingOverlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/90 rounded-2xl">
+                    <div class="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+                    <p class="font-bold text-white">Initializing AI Engine...</p>
+                </div>
+                <div class="video-container">
+                    <video id="videoElement" playsinline autoplay muted></video>
+                    <canvas id="canvasElement"></canvas>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Time Left</div>
+                    <div id="timeDisplay" class="text-4xl font-black text-indigo-400 font-mono">30s</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Total Reps</div>
+                    <div id="repDisplay" class="text-4xl font-black text-blue-400 font-mono">0</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Current Grade</div>
+                    <div id="gradeDisplay" class="text-4xl font-black text-slate-500">-</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-2">
+                <button id="startBtn" class="flex-grow py-4 rounded-xl text-lg font-black text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Start 30s Test
+                </button>
+                <button id="resetBtn" class="px-8 py-4 rounded-xl font-bold text-white bg-slate-700 hover:bg-slate-600 transition">
+                    Reset
+                </button>
+            </div>
+            
+            <div id="statusBanner" class="p-3 bg-slate-800 text-sm font-semibold text-center text-slate-300 rounded-xl border border-slate-700">
+                Stand in view of the camera to begin tracking.
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- DUMMY NAPFA SCORING MATRIX (Approximations for 30s test) ---
+        const SCORING = {
+            pullup: {
+                M: {
+                    15: { A: 12, B: 10, C: 8, D: 5, E: 3 },
+                    16: { A: 13, B: 11, C: 9, D: 6, E: 4 },
+                    17: { A: 14, B: 12, C: 10, D: 7, E: 5 },
+                    18: { A: 15, B: 13, C: 11, D: 8, E: 6 }
+                },
+                F: { // Generally F doesn't do standard pullups, providing fallback
+                    15: { A: 6, B: 5, C: 4, D: 3, E: 1 },
+                    16: { A: 7, B: 6, C: 5, D: 4, E: 2 },
+                    17: { A: 8, B: 7, C: 6, D: 5, E: 3 },
+                    18: { A: 8, B: 7, C: 6, D: 5, E: 3 }
+                }
+            },
+            inclined: {
+                M: {
+                    13: { A: 26, B: 22, C: 18, D: 14, E: 10 },
+                    14: { A: 28, B: 24, C: 20, D: 16, E: 12 },
+                    15: { A: 30, B: 26, C: 22, D: 18, E: 14 },
+                    16: { A: 32, B: 28, C: 24, D: 20, E: 16 },
+                    17: { A: 34, B: 30, C: 26, D: 22, E: 18 },
+                    18: { A: 36, B: 32, C: 28, D: 24, E: 20 }
+                },
+                F: {
+                    13: { A: 22, B: 18, C: 14, D: 10, E: 6 },
+                    14: { A: 24, B: 20, C: 16, D: 12, E: 8 },
+                    15: { A: 26, B: 22, C: 18, D: 14, E: 10 },
+                    16: { A: 28, B: 24, C: 20, D: 16, E: 12 },
+                    17: { A: 30, B: 26, C: 22, D: 18, E: 14 },
+                    18: { A: 32, B: 28, C: 24, D: 20, E: 16 }
+                }
+            }
+        };
+
+        // --- GLOBAL APP STATE ---
+        let state = {
+            reps: 0,
+            posture: "UNKNOWN", // UNKNOWN, DOWN, UP
+            isTesting: false,
+            timeLeft: 30,
+            audioEnabled: true,
+            currentGrade: "-",
+            selectedCamera: ""
+        };
+        let timerInterval = null;
+        let currentStream = null;
+        let poseEngine = null;
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            gender: document.getElementById('genderSelect'),
+            age: document.getElementById('ageSelect'),
+            exercise: document.getElementById('exerciseSelect'),
+            camera: document.getElementById('cameraSelect'),
+            
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            overlay: document.getElementById('loadingOverlay'),
+            
+            time: document.getElementById('timeDisplay'),
+            reps: document.getElementById('repDisplay'),
+            grade: document.getElementById('gradeDisplay'),
+            bodyState: document.getElementById('bodyStateDisplay'),
+            jointInfo: document.getElementById('jointInfo'),
+            statusBanner: document.getElementById('statusBanner'),
+            
+            startBtn: document.getElementById('startBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            audioBtn: document.getElementById('toggleAudioBtn'),
+            audioText: document.getElementById('audioText')
+        };
+        const ctx = els.canvas.getContext('2d');
+
+        // --- AUDIO ENGINE ---
+        function speak(text, priority = false) {
+            if (!state.audioEnabled) return;
+            if (priority) window.speechSynthesis.cancel(); // Interrupt
+            const u = new SpeechSynthesisUtterance(text);
+            u.rate = 1.1;
+            window.speechSynthesis.speak(u);
+        }
+
+        els.audioBtn.onclick = () => {
+            state.audioEnabled = !state.audioEnabled;
+            els.audioText.innerText = state.audioEnabled ? "Voice: ON" : "Voice: OFF";
+            if (state.audioEnabled) speak("Audio enabled", true);
+        };
+
+        // --- CONFIGURATION LOGIC ---
+        function handleAutoSelection() {
+            const gender = els.gender.value;
+            const age = parseInt(els.age.value);
+            
+            // NAPFA standard: Male 15+ does standard pull-ups
+            if (gender === 'M' && age >= 15) {
+                els.exercise.value = "pullup";
+            } else {
+                els.exercise.value = "inclined";
+            }
+            updateGradeUI();
+        }
+
+        els.gender.addEventListener('change', handleAutoSelection);
+        els.age.addEventListener('change', handleAutoSelection);
+        els.exercise.addEventListener('change', updateGradeUI);
+
+        // --- CAMERA SYSTEM ---
+        async function getCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                els.camera.innerHTML = "";
+                videoDevices.forEach((d, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.text = d.label || `Camera ${i + 1}`;
+                    els.camera.appendChild(opt);
+                });
+                if (videoDevices.length > 0) {
+                    state.selectedCamera = videoDevices[0].deviceId;
+                    startCamera();
+                }
+            } catch (e) {
+                console.error("Camera access failed", e);
+            }
+        }
+
+        async function startCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
+            
+            const constraints = {
+                video: state.selectedCamera ? { deviceId: { exact: state.selectedCamera } } : { facingMode: 'user' }
+            };
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                els.video.srcObject = currentStream;
+                els.video.onloadedmetadata = () => {
+                    els.canvas.width = els.video.videoWidth;
+                    els.canvas.height = els.video.videoHeight;
+                    // Mirror logic: if front camera, mirror canvas. Usually 'user' facing implies mirroring.
+                    const isFront = currentStream.getVideoTracks()[0].getSettings().facingMode === 'user';
+                    els.canvas.style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
+                };
+            } catch (err) {
+                alert("Please grant camera permissions to use the app.");
+            }
+        }
+
+        els.camera.addEventListener('change', (e) => {
+            state.selectedCamera = e.target.value;
+            startCamera();
+        });
+
+        // --- GEOMETRY MATH ---
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs((radians * 180.0) / Math.PI);
+            if (angle > 180.0) angle = 360.0 - angle;
+            return Math.round(angle);
+        }
+
+        // --- REP COUNTING ENGINE ---
+        function processLandmarks(landmarks) {
+            // Find most visible arm
+            const lShoulder = landmarks[11], lElbow = landmarks[13], lWrist = landmarks[15];
+            const rShoulder = landmarks[12], rElbow = landmarks[14], rWrist = landmarks[16];
+            const nose = landmarks[0];
+
+            const lVis = (lShoulder.visibility + lElbow.visibility + lWrist.visibility);
+            const rVis = (rShoulder.visibility + rElbow.visibility + rWrist.visibility);
+            
+            const useRight = rVis > lVis;
+            const shoulder = useRight ? rShoulder : lShoulder;
+            const elbow = useRight ? rElbow : lElbow;
+            const wrist = useRight ? rWrist : lWrist;
+
+            if (shoulder.visibility < 0.5 || elbow.visibility < 0.5 || wrist.visibility < 0.5) {
+                updateBodyState("NOT DETECTED", "text-red-400");
+                return;
+            }
+
+            const elbowAngle = calculateAngle(shoulder, elbow, wrist);
+            els.jointInfo.innerText = `Elbow: ${elbowAngle}° | Nose Y: ${nose.y.toFixed(2)} | Wrist Y: ${wrist.y.toFixed(2)}`;
+            
+            const exType = els.exercise.value;
+
+            // --- PULL-UP LOGIC ---
+            if (exType === "pullup") {
+                // Down state: arms nearly straight
+                if (elbowAngle > 150) {
+                    if (state.posture !== "DOWN") setPosture("DOWN", "text-blue-400");
+                } 
+                // Up state: nose is physically above wrists. On screen, Y=0 is top.
+                // So nose.y MUST BE LESS THAN wrist.y
+                else if (state.posture === "DOWN" && nose.y < wrist.y) {
+                    setPosture("UP", "text-indigo-400");
+                    recordRep();
+                }
+            } 
+            // --- INCLINED PULL-UP LOGIC ---
+            else {
+                // Down state: arms straight
+                if (elbowAngle > 150) {
+                    if (state.posture !== "DOWN") setPosture("DOWN", "text-blue-400");
+                }
+                // Up state: elbows bent past 90 degrees
+                else if (state.posture === "DOWN" && elbowAngle < 90) {
+                    setPosture("UP", "text-indigo-400");
+                    recordRep();
+                }
+            }
+        }
+
+        function setPosture(posture, colorClass) {
+            state.posture = posture;
+            updateBodyState(posture, colorClass);
+        }
+
+        function updateBodyState(text, colorClass) {
+            els.bodyState.innerText = text;
+            els.bodyState.className = `px-6 py-2 rounded-lg bg-slate-900 border border-slate-700 font-black w-full mb-2 ${colorClass}`;
+        }
+
+        function recordRep() {
+            if (!state.isTesting) return;
+            state.reps++;
+            els.reps.innerText = state.reps;
+            speak(state.reps.toString(), true);
+            updateGradeUI();
+        }
+
+        // --- SCORING SYSTEM ---
+        function updateGradeUI() {
+            if (!state.isTesting && state.reps === 0) {
+                els.grade.innerText = "-";
+                els.grade.className = "text-4xl font-black text-slate-500";
+                return;
+            }
+
+            const ex = els.exercise.value;
+            const g = els.gender.value;
+            const a = els.age.value;
+            
+            // Fallback safety if config doesn't exist
+            let targets = SCORING[ex]?.[g]?.[a];
+            if (!targets) targets = { A: 15, B: 12, C: 9, D: 6, E: 3 }; // Generic fallback
+
+            let gradeStr = "Fail";
+            let color = "text-red-500";
+
+            if (state.reps >= targets.A) { gradeStr = "A"; color = "text-green-400"; }
+            else if (state.reps >= targets.B) { gradeStr = "B"; color = "text-teal-400"; }
+            else if (state.reps >= targets.C) { gradeStr = "C"; color = "text-blue-400"; }
+            else if (state.reps >= targets.D) { gradeStr = "D"; color = "text-orange-400"; }
+            else if (state.reps >= targets.E) { gradeStr = "E"; color = "text-orange-600"; }
+
+            if (gradeStr !== state.currentGrade && gradeStr !== "Fail" && state.currentGrade !== "-") {
+                speak(`Grade ${gradeStr}`);
+            }
+            
+            state.currentGrade = gradeStr;
+            els.grade.innerText = gradeStr;
+            els.grade.className = `text-4xl font-black ${color}`;
+        }
+
+        // --- TEST CONTROLS ---
+        els.startBtn.onclick = () => {
+            if (state.isTesting) return;
+            state.isTesting = true;
+            state.reps = 0;
+            state.timeLeft = 30;
+            state.currentGrade = "-";
+            els.reps.innerText = "0";
+            updateGradeUI();
+            
+            els.startBtn.disabled = true;
+            els.statusBanner.innerText = "Test in progress! Do your reps!";
+            els.statusBanner.className = "p-3 bg-indigo-900/50 text-sm font-semibold text-center text-indigo-300 rounded-xl border border-indigo-500";
+            
+            // Prime speech synthesis
+            window.speechSynthesis.resume();
+            speak("Ready. Set. Go!", true);
+
+            timerInterval = setInterval(() => {
+                state.timeLeft--;
+                els.time.innerText = `${state.timeLeft}s`;
+
+                if (state.timeLeft === 10) speak("10 seconds left!");
+                if (state.timeLeft <= 3 && state.timeLeft > 0) speak(state.timeLeft.toString());
+
+                if (state.timeLeft <= 0) {
+                    endTest();
+                }
+            }, 1000);
+        };
+
+        els.resetBtn.onclick = () => {
+            endTest(true);
+            state.reps = 0;
+            state.timeLeft = 30;
+            els.time.innerText = "30s";
+            els.reps.innerText = "0";
+            updateGradeUI();
+            els.statusBanner.innerText = "Stand in view of the camera to begin tracking.";
+            els.statusBanner.className = "p-3 bg-slate-800 text-sm font-semibold text-center text-slate-300 rounded-xl border border-slate-700";
+            speak("Test reset", true);
+        };
+
+        function endTest(manual = false) {
+            state.isTesting = false;
+            clearInterval(timerInterval);
+            els.startBtn.disabled = false;
+            if (!manual) {
+                els.statusBanner.innerText = `Time's up! Total Reps: ${state.reps} | Grade: ${state.currentGrade}`;
+                speak(`Time is up. You completed ${state.reps} reps. Grade ${state.currentGrade}`, true);
+            }
+        }
+
+        // --- MEDIAPIPE INITIALIZATION ---
+        poseEngine = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        poseEngine.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        poseEngine.onResults((results) => {
+            // Hide loading overlay
+            if (!els.overlay.classList.contains('hidden')) {
+                els.overlay.classList.add('hidden');
+                getCameras(); // Populate cameras once engine is ready
+            }
+
+            ctx.save();
+            ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+            
+            // Draw video frame to canvas
+            ctx.drawImage(results.image, 0, 0, els.canvas.width, els.canvas.height);
+
+            if (results.poseLandmarks) {
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: 'rgba(99, 102, 241, 0.7)', lineWidth: 4 });
+                drawLandmarks(ctx, results.poseLandmarks, { color: '#60a5fa', lineWidth: 2, radius: 4 });
+                processLandmarks(results.poseLandmarks);
+            } else {
+                updateBodyState("NOT DETECTED", "text-red-400");
+            }
+            ctx.restore();
+        });
+
+        // Use custom requestAnimationFrame loop instead of MediaPipe Camera utility
+        // for smoother camera switching and direct control
+        async function renderLoop() {
+            if (els.video.readyState >= 2) {
+                await poseEngine.send({ image: els.video });
+            }
+            requestAnimationFrame(renderLoop);
+        }
+
+        // Initialization
+        window.onload = () => {
+            handleAutoSelection(); // Set initial exercise based on defaults
+            startCamera().then(() => {
+                renderLoop();
+            });
+        };
+
+    </script>
+</body>
+</html>
