@@ -1,0 +1,557 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPFA Standing Broad Jump AI</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 1rem;
+            overflow: hidden;
+            background-color: #000;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+        video {
+            display: none;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* Side profile view usually shouldn't be mirrored to preserve L-R physical map */
+        }
+        input[type=range] {
+            accent-color: #6366f1;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 sm:p-6 lg:items-center">
+
+    <header class="w-full max-w-6xl mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 glass-card p-5 rounded-2xl">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl shadow-lg text-white">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+                        Broad Jump AI Scorer
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-400 font-medium">Side-Profile Auto Measurement</p>
+                </div>
+            </div>
+            <button id="toggleAudioBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition flex items-center gap-2 text-cyan-400 shadow-md">
+                <span id="audioIcon">🔊</span> <span id="audioText">Voice: ON</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+        
+        <!-- Left Column: Controls -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            <section class="glass-card p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Student Profile</h2>
+                <div class="flex gap-4 mb-4 text-sm font-semibold text-slate-300">
+                    <div class="flex-1">
+                        <label class="block mb-2">Gender</label>
+                        <select id="genderSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-cyan-500">
+                            <option value="M" selected>Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block mb-2">Age</label>
+                        <select id="ageSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-cyan-500">
+                            <option value="13">13</option>
+                            <option value="14">14</option>
+                            <option value="15">15</option>
+                            <option value="16" selected>16</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="text-sm font-semibold text-slate-300">
+                    <label class="block mb-2">Camera Select</label>
+                    <select id="cameraSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 outline-none focus:border-cyan-500">
+                        <option value="">Loading cameras...</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="glass-card p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Required Standards (cm)</h2>
+                <div class="grid grid-cols-5 gap-2 text-center">
+                    <div class="bg-slate-800/50 py-2 rounded-lg border border-green-500/30">
+                        <div class="text-[10px] sm:text-xs font-bold text-green-400">A</div>
+                        <div id="targetA" class="text-xs sm:text-sm font-black text-white mt-1">-</div>
+                    </div>
+                    <div class="bg-slate-800/50 py-2 rounded-lg border border-teal-500/30">
+                        <div class="text-[10px] sm:text-xs font-bold text-teal-400">B</div>
+                        <div id="targetB" class="text-xs sm:text-sm font-black text-white mt-1">-</div>
+                    </div>
+                    <div class="bg-slate-800/50 py-2 rounded-lg border border-cyan-500/30">
+                        <div class="text-[10px] sm:text-xs font-bold text-cyan-400">C</div>
+                        <div id="targetC" class="text-xs sm:text-sm font-black text-white mt-1">-</div>
+                    </div>
+                    <div class="bg-slate-800/50 py-2 rounded-lg border border-orange-400/30">
+                        <div class="text-[10px] sm:text-xs font-bold text-orange-400">D</div>
+                        <div id="targetD" class="text-xs sm:text-sm font-black text-white mt-1">-</div>
+                    </div>
+                    <div class="bg-slate-800/50 py-2 rounded-lg border border-orange-600/30">
+                        <div class="text-[10px] sm:text-xs font-bold text-orange-600">E</div>
+                        <div id="targetE" class="text-xs sm:text-sm font-black text-white mt-1">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="glass-card p-5 rounded-2xl">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">Floor Calibration</h2>
+                <p class="text-[11px] text-slate-400 mb-4">Position camera sideways. Align the colored lines with the physical jump mat markers.</p>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="flex justify-between text-sm font-bold text-red-400 mb-2">
+                            <span>Start Line (0cm)</span>
+                            <span id="startLineVal">15%</span>
+                        </label>
+                        <input type="range" id="startLineSlider" min="0" max="100" value="15" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-sm font-bold text-green-400 mb-2">
+                            <span>Reference (300cm)</span>
+                            <span id="endLineVal">85%</span>
+                        </label>
+                        <input type="range" id="endLineSlider" min="0" max="100" value="85" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            <div class="glass-card p-3 rounded-2xl relative shadow-2xl">
+                <div id="loadingOverlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/90 rounded-2xl">
+                    <div class="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
+                    <p class="font-bold text-white">Loading Vision AI...</p>
+                </div>
+                <div class="video-container">
+                    <video id="videoElement" playsinline autoplay muted></video>
+                    <canvas id="canvasElement"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Jump Phase</div>
+                    <div id="stateDisplay" class="text-xl sm:text-2xl font-black text-yellow-400 tracking-tight">WAITING</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Distance (cm)</div>
+                    <div id="distanceDisplay" class="text-3xl sm:text-4xl font-black text-white font-mono">0</div>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
+                    <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">NAPFA Grade</div>
+                    <div id="gradeDisplay" class="text-3xl sm:text-4xl font-black text-slate-500">-</div>
+                </div>
+            </div>
+
+            <button id="resetBtn" class="w-full py-4 rounded-xl text-lg font-black text-white bg-slate-700 hover:bg-slate-600 shadow-lg transition duration-200">
+                Reset For Next Student
+            </button>
+        </div>
+    </main>
+
+    <script>
+        // Official NAPFA Broad Jump Scoring Matrix (in cm)
+        const SCORING = {
+            "M": {
+                "13": { A: 214, B: 201, C: 188, D: 175, E: 162 },
+                "14": { A: 225, B: 212, C: 199, D: 186, E: 173 },
+                "15": { A: 237, B: 224, C: 211, D: 198, E: 185 },
+                "16": { A: 245, B: 232, C: 219, D: 206, E: 193 }
+            },
+            "F": {
+                "13": { A: 171, B: 158, C: 145, D: 132, E: 119 },
+                "14": { A: 177, B: 164, C: 151, D: 138, E: 125 },
+                "15": { A: 183, B: 170, C: 157, D: 144, E: 131 },
+                "16": { A: 188, B: 175, C: 162, D: 149, E: 136 }
+            }
+        };
+
+        // App State Engine
+        let appState = {
+            status: "WAITING", // WAITING -> READY -> JUMPING -> LANDED
+            audioEnabled: true,
+            startPct: 15,
+            endPct: 85,
+            selectedCamera: "",
+            historyX: [], // Tracks back heel X to determine stability
+            finalDistance: 0,
+            finalGrade: "-"
+        };
+
+        let currentStream = null;
+        let poseEngine = null;
+        let lastSpokenStatus = "";
+
+        // DOM Elements
+        const DOM = {
+            gender: document.getElementById('genderSelect'),
+            age: document.getElementById('ageSelect'),
+            camera: document.getElementById('cameraSelect'),
+            startSlider: document.getElementById('startLineSlider'),
+            endSlider: document.getElementById('endLineSlider'),
+            startVal: document.getElementById('startLineVal'),
+            endVal: document.getElementById('endLineVal'),
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            overlay: document.getElementById('loadingOverlay'),
+            stateText: document.getElementById('stateDisplay'),
+            distText: document.getElementById('distanceDisplay'),
+            gradeText: document.getElementById('gradeDisplay'),
+            resetBtn: document.getElementById('resetBtn'),
+            audioBtn: document.getElementById('toggleAudioBtn'),
+            audioText: document.getElementById('audioText'),
+            targetA: document.getElementById('targetA'),
+            targetB: document.getElementById('targetB'),
+            targetC: document.getElementById('targetC'),
+            targetD: document.getElementById('targetD'),
+            targetE: document.getElementById('targetE')
+        };
+        const ctx = DOM.canvas.getContext('2d');
+
+        function speak(text, priority = false) {
+            if (!appState.audioEnabled) return;
+            if (priority) window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        DOM.audioBtn.onclick = () => {
+            appState.audioEnabled = !appState.audioEnabled;
+            DOM.audioText.innerText = appState.audioEnabled ? "Voice: ON" : "Voice: OFF";
+            DOM.audioBtn.classList.toggle("text-cyan-400", appState.audioEnabled);
+            DOM.audioBtn.classList.toggle("text-slate-400", !appState.audioEnabled);
+            // Initialize audio context on user interaction
+            if (appState.audioEnabled) speak("Audio enabled"); 
+        };
+
+        // Slider logic
+        DOM.startSlider.oninput = (e) => {
+            appState.startPct = parseInt(e.target.value);
+            DOM.startVal.innerText = `${appState.startPct}%`;
+        };
+        DOM.endSlider.oninput = (e) => {
+            appState.endPct = parseInt(e.target.value);
+            DOM.endVal.innerText = `${appState.endPct}%`;
+        };
+
+        function updateStandardsBoard() {
+            const g = DOM.gender.value;
+            const a = DOM.age.value;
+            let targets = SCORING[g]?.[a];
+            if (!targets) targets = { A: "-", B: "-", C: "-", D: "-", E: "-" };
+
+            DOM.targetA.innerText = targets.A;
+            DOM.targetB.innerText = targets.B;
+            DOM.targetC.innerText = targets.C;
+            DOM.targetD.innerText = targets.D;
+            DOM.targetE.innerText = targets.E;
+        }
+
+        DOM.gender.addEventListener('change', updateStandardsBoard);
+        DOM.age.addEventListener('change', updateStandardsBoard);
+
+        function updateUI(statusText, colorClass) {
+            if (appState.status !== statusText) {
+                appState.status = statusText;
+                DOM.stateText.innerText = statusText;
+                DOM.stateText.className = `text-xl sm:text-2xl font-black tracking-tight ${colorClass}`;
+            }
+        }
+
+        async function getCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                DOM.camera.innerHTML = "";
+                videoDevices.forEach((d, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.text = d.label || `Camera ${i + 1}`;
+                    DOM.camera.appendChild(opt);
+                });
+                if (videoDevices.length > 0) {
+                    appState.selectedCamera = videoDevices[0].deviceId;
+                    startCamera();
+                }
+            } catch (e) {
+                console.error("Camera access failed", e);
+            }
+        }
+
+        async function startCamera() {
+            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            
+            const constraints = {
+                video: appState.selectedCamera 
+                    ? { deviceId: { exact: appState.selectedCamera } } 
+                    : { facingMode: 'environment' }
+            };
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                DOM.video.srcObject = currentStream;
+                DOM.video.onloadedmetadata = () => {
+                    DOM.canvas.width = DOM.video.videoWidth;
+                    DOM.canvas.height = DOM.video.videoHeight;
+                };
+            } catch (err) {
+                alert("Please grant camera permissions in your browser.");
+            }
+        }
+
+        DOM.camera.addEventListener('change', (e) => {
+            appState.selectedCamera = e.target.value;
+            startCamera();
+        });
+
+        DOM.resetBtn.onclick = () => {
+            appState.status = "WAITING";
+            appState.historyX = [];
+            appState.finalDistance = 0;
+            appState.finalGrade = "-";
+            lastSpokenStatus = "";
+            updateUI("WAITING", "text-yellow-400");
+            DOM.distText.innerText = "0";
+            DOM.gradeText.innerText = "-";
+            DOM.gradeText.className = "text-3xl sm:text-4xl font-black text-slate-500";
+            speak("Ready for next jumper.", true);
+        };
+
+        function calculateGrade(dist) {
+            const g = DOM.gender.value;
+            const a = DOM.age.value;
+            let targets = SCORING[g]?.[a];
+            if (!targets) targets = { A: 200, B: 180, C: 160, D: 140, E: 120 }; // Fallback
+
+            let gradeStr = "Fail";
+            let color = "text-red-500";
+
+            if (dist >= targets.A) { gradeStr = "A"; color = "text-green-400"; }
+            else if (dist >= targets.B) { gradeStr = "B"; color = "text-teal-400"; }
+            else if (dist >= targets.C) { gradeStr = "C"; color = "text-cyan-400"; }
+            else if (dist >= targets.D) { gradeStr = "D"; color = "text-orange-400"; }
+            else if (dist >= targets.E) { gradeStr = "E"; color = "text-orange-600"; }
+
+            appState.finalGrade = gradeStr;
+            DOM.gradeText.innerText = gradeStr;
+            DOM.gradeText.className = `text-3xl sm:text-4xl font-black ${color}`;
+            
+            speak(`Jump finished. Distance, ${dist} centimeters. Grade ${gradeStr}.`, true);
+        }
+
+        function isStable(history, threshold = 0.012) {
+            if (history.length < 15) return false;
+            let min = Math.min(...history);
+            let max = Math.max(...history);
+            return (max - min) < threshold;
+        }
+
+        function processJumpLogic(landmarks) {
+            if (appState.status === "LANDED") return;
+
+            // MediaPipe Heel Landmarks: 29 (Left), 30 (Right)
+            let lHeel = landmarks[29];
+            let rHeel = landmarks[30];
+
+            if (lHeel.visibility < 0.5 && rHeel.visibility < 0.5) return;
+
+            // Assuming user jumps Left-to-Right. The back-most part of foot dictates distance.
+            let backHeelX = Math.min(lHeel.x, rHeel.x);
+            
+            // Convert sliders from % to float
+            let normStart = appState.startPct / 100;
+            let normEnd = appState.endPct / 100;
+
+            // Track movement history
+            appState.historyX.push(backHeelX);
+            if (appState.historyX.length > 20) appState.historyX.shift();
+
+            let stable = isStable(appState.historyX);
+
+            // STATE MACHINE LOGIC
+            if (appState.status === "WAITING") {
+                // To be ready, user must be stable and standing just on/behind the start line
+                if (stable && backHeelX < normStart + 0.05 && backHeelX > normStart - 0.15) {
+                    updateUI("READY", "text-green-400");
+                    if (lastSpokenStatus !== "READY") {
+                        speak("Ready. Jump when ready.", true);
+                        lastSpokenStatus = "READY";
+                    }
+                }
+            } 
+            else if (appState.status === "READY") {
+                // Rapid movement past start line
+                if (!stable && backHeelX > normStart + 0.06) {
+                    updateUI("JUMPING", "text-cyan-400");
+                    if (lastSpokenStatus !== "JUMPING") {
+                        speak("Jump!", true);
+                        lastSpokenStatus = "JUMPING";
+                    }
+                }
+                // Moved too far back or walked away
+                else if (stable && backHeelX < normStart - 0.16) {
+                    updateUI("WAITING", "text-yellow-400");
+                    lastSpokenStatus = "";
+                }
+            }
+            else if (appState.status === "JUMPING") {
+                // Wait until they land and remain mostly stable
+                if (stable) {
+                    // Calculate jump distance in CM via linear interpolation
+                    let distNorm = backHeelX - normStart;
+                    let distCm = (distNorm / (normEnd - normStart)) * 300;
+                    
+                    // Filter out micro-movements (must be > 60cm jump)
+                    if (distCm > 60) {
+                        updateUI("LANDED", "text-purple-400");
+                        appState.finalDistance = Math.round(distCm);
+                        DOM.distText.innerText = appState.finalDistance;
+                        calculateGrade(appState.finalDistance);
+                    } else if (distCm <= 10) {
+                        // User likely walked backwards
+                        updateUI("WAITING", "text-yellow-400");
+                        lastSpokenStatus = "";
+                    }
+                }
+            }
+        }
+
+        poseEngine = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        poseEngine.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+
+        poseEngine.onResults((results) => {
+            // Hide loading overlay on first frame
+            if (!DOM.overlay.classList.contains('hidden')) {
+                DOM.overlay.classList.add('hidden');
+                getCameras();
+            }
+
+            ctx.save();
+            ctx.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+            
+            // Draw Original Video
+            ctx.drawImage(results.image, 0, 0, DOM.canvas.width, DOM.canvas.height);
+
+            // Draw Calibration Lines
+            const startPixelX = DOM.canvas.width * (appState.startPct / 100);
+            const endPixelX = DOM.canvas.width * (appState.endPct / 100);
+            
+            // 0cm Line
+            ctx.beginPath();
+            ctx.moveTo(startPixelX, 0);
+            ctx.lineTo(startPixelX, DOM.canvas.height);
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)'; // Red-500
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(239, 68, 68, 1)';
+            ctx.font = 'bold 20px Inter';
+            ctx.fillText("0cm", startPixelX + 10, 30);
+
+            // 300cm Line
+            ctx.beginPath();
+            ctx.moveTo(endPixelX, 0);
+            ctx.lineTo(endPixelX, DOM.canvas.height);
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)'; // Green-500
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(34, 197, 94, 1)';
+            ctx.fillText("300cm", endPixelX - 80, 30);
+
+            // Process AI Pose
+            if (results.poseLandmarks) {
+                // Dim down the upper body connections for visual clarity
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: 'rgba(255,255,255,0.2)', lineWidth: 2 });
+                
+                // Highlight Heels (Landmarks 29 & 30)
+                let lHeel = results.poseLandmarks[29];
+                let rHeel = results.poseLandmarks[30];
+                
+                ctx.fillStyle = '#facc15'; // Yellow
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+
+                if (lHeel.visibility > 0.5) {
+                    ctx.beginPath();
+                    ctx.arc(lHeel.x * DOM.canvas.width, lHeel.y * DOM.canvas.height, 8, 0, 2 * Math.PI);
+                    ctx.fill(); ctx.stroke();
+                }
+                if (rHeel.visibility > 0.5) {
+                    ctx.beginPath();
+                    ctx.arc(rHeel.x * DOM.canvas.width, rHeel.y * DOM.canvas.height, 8, 0, 2 * Math.PI);
+                    ctx.fill(); ctx.stroke();
+                }
+
+                // Process Jumping State Logic
+                processJumpLogic(results.poseLandmarks);
+            }
+            ctx.restore();
+        });
+
+        // Loop to continuously send video frames to MediaPipe
+        async function renderLoop() {
+            if (DOM.video.readyState >= 2) {
+                await poseEngine.send({ image: DOM.video });
+            }
+            requestAnimationFrame(renderLoop);
+        }
+
+        // Start initialization on window load
+        window.onload = () => {
+            updateStandardsBoard();
+            startCamera().then(() => {
+                renderLoop();
+            });
+        };
+    </script>
+</body>
+</html>
