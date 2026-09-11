@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPFA Sit & Reach AI Scorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <style>
+        .video-container { position: relative; width: 100%; max-width: 800px; margin: auto; }
+        video { width: 100%; border-radius: 0.5rem; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        .slider-container { width: 100%; max-width: 800px; margin: auto; margin-top: 10px; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 p-4 flex flex-col items-center">
+
+    <div class="max-w-4xl w-full bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">Sit & Reach AI Scorer</h1>
+
+        <!-- Settings Row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 bg-gray-50 p-4 rounded-md">
+            <div>
+                <label class="font-semibold block text-sm">Gender:</label>
+                <select id="genderSelect" class="border p-1 rounded w-full">
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-semibold block text-sm">Age:</label>
+                <select id="ageSelect" class="border p-1 rounded w-full">
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16" selected>16</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-semibold block text-sm">Start Line (cm):</label>
+                <input type="number" id="startLineCm" value="0" class="border p-1 rounded w-full">
+            </div>
+            <div>
+                <label class="font-semibold block text-sm">End Line (cm):</label>
+                <input type="number" id="endLineCm" value="50" class="border p-1 rounded w-full">
+            </div>
+        </div>
+
+        <!-- Target Board -->
+        <div class="mb-4 bg-blue-50 p-3 rounded-md text-center">
+            <h3 class="font-bold text-blue-800 mb-2">Required Standards (cm)</h3>
+            <div id="targetBoard" class="flex justify-center gap-4 text-sm font-semibold">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="grid grid-cols-3 gap-4 text-center mb-6">
+            <div class="bg-gray-800 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Current Reach</div>
+                <div id="currentReachDisplay" class="text-3xl font-bold">0.0 cm</div>
+            </div>
+            <div class="bg-yellow-500 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Hold Timer</div>
+                <div id="holdTimerDisplay" class="text-3xl font-bold">Wait...</div>
+            </div>
+            <div class="bg-green-500 text-white p-4 rounded-lg">
+                <div class="text-sm uppercase tracking-wide">Final Score</div>
+                <div id="finalScoreDisplay" class="text-3xl font-bold">-</div>
+            </div>
+        </div>
+
+        <!-- Camera Area -->
+        <div class="video-container bg-black flex justify-center items-center relative">
+            <div id="loadingText" class="absolute text-white z-0">Loading AI...</div>
+            <!-- Using standard video mirroring to match user movement -->
+            <video id="videoElement" playsinline autoplay muted></video>
+            <canvas id="canvasElement"></canvas>
+            
+            <!-- Warning Overlay -->
+            <div id="foulWarning" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full font-bold text-xl hidden z-20 shadow-lg">
+                ⚠️ FOUL: STRAIGHTEN KNEES!
+            </div>
+        </div>
+
+        <!-- Calibration Sliders -->
+        <div class="slider-container space-y-4">
+            <div>
+                <label class="font-semibold text-red-600">Align Start Line on Video (Position in %):</label>
+                <input type="range" id="startSlider" min="0" max="100" value="20" class="w-full">
+            </div>
+            <div>
+                <label class="font-semibold text-green-600">Align End Line on Video (Position in %):</label>
+                <input type="range" id="endSlider" min="0" max="100" value="80" class="w-full">
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-center gap-4 mt-6">
+            <button id="startBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-green-700">
+                Start Test
+            </button>
+            <button id="resetBtn" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow hover:bg-red-600">
+                Reset
+            </button>
+        </div>
+        
+        <p id="statusMsg" class="text-center mt-4 text-lg font-semibold text-gray-600">
+            Align the physical lines using the sliders, then click Start.
+        </p>
+    </div>
+
+    <script>
+        // --- NAPFA SCORING MATRIX (Sit and Reach in CM) ---
+        const napfaScoring = {
+            "M": {
+                "13": { A: 42, B: 38, C: 34, D: 30, E: 26 },
+                "14": { A: 44, B: 40, C: 36, D: 32, E: 28 },
+                "15": { A: 46, B: 42, C: 38, D: 34, E: 30 },
+                "16": { A: 48, B: 44, C: 40, D: 36, E: 32 }
+            },
+            "F": {
+                "13": { A: 44, B: 40, C: 36, D: 32, E: 28 },
+                "14": { A: 46, B: 42, C: 38, D: 34, E: 30 },
+                "15": { A: 47, B: 43, C: 39, D: 35, E: 31 },
+                "16": { A: 48, B: 44, C: 40, D: 36, E: 32 }
+            }
+        };
+
+        // --- DOM Elements ---
+        const genderSelect = document.getElementById('genderSelect');
+        const ageSelect = document.getElementById('ageSelect');
+        const targetBoard = document.getElementById('targetBoard');
+        
+        const startLineCmInput = document.getElementById('startLineCm');
+        const endLineCmInput = document.getElementById('endLineCm');
+        const startSlider = document.getElementById('startSlider');
+        const endSlider = document.getElementById('endSlider');
+
+        const currentReachDisplay = document.getElementById('currentReachDisplay');
+        const holdTimerDisplay = document.getElementById('holdTimerDisplay');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const foulWarning = document.getElementById('foulWarning');
+        const statusMsg = document.getElementById('statusMsg');
+
+        const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('canvasElement');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loadingText = document.getElementById('loadingText');
+
+        // --- App State ---
+        let isTesting = false;
+        let testCompleted = false;
+        let currentMaxReach = 0;
+        let holdStartTime = 0;
+        let bestScore = 0;
+        const HOLD_DURATION = 2000; // 2 seconds in milliseconds
+
+        // Update target board when age/gender changes
+        function updateTargetBoard() {
+            const matrix = napfaScoring[genderSelect.value][ageSelect.value];
+            targetBoard.innerHTML = `
+                <span class="text-green-600">A: ${matrix.A}+</span> |
+                <span class="text-blue-600">B: ${matrix.B}+</span> |
+                <span class="text-yellow-600">C: ${matrix.C}+</span> |
+                <span class="text-orange-600">D: ${matrix.D}+</span> |
+                <span class="text-red-600">E: ${matrix.E}+</span>
+            `;
+        }
+        genderSelect.addEventListener('change', updateTargetBoard);
+        ageSelect.addEventListener('change', updateTargetBoard);
+        updateTargetBoard(); // Init
+
+        // --- Controls ---
+        document.getElementById('startBtn').addEventListener('click', () => {
+            isTesting = true;
+            testCompleted = false;
+            bestScore = 0;
+            currentMaxReach = 0;
+            holdStartTime = 0;
+            finalScoreDisplay.innerText = "-";
+            statusMsg.innerText = "Test Started! Push forward slowly and hold for 2 seconds.";
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isTesting = false;
+            testCompleted = false;
+            currentReachDisplay.innerText = "0.0 cm";
+            holdTimerDisplay.innerText = "Wait...";
+            finalScoreDisplay.innerText = "-";
+            statusMsg.innerText = "Align the physical lines using the sliders, then click Start.";
+            foulWarning.classList.add('hidden');
+        });
+
+        // --- Math & Logic ---
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        // Convert pixel X coordinate to CM using linear interpolation
+        function pixelsToCm(pixelX, canvasWidth) {
+            const startX = (startSlider.value / 100) * canvasWidth;
+            const endX = (endSlider.value / 100) * canvasWidth;
+            const startCm = parseFloat(startLineCmInput.value);
+            const endCm = parseFloat(endLineCmInput.value);
+
+            // Avoid division by zero
+            if (startX === endX) return 0; 
+            
+            // Linear mapping
+            const ratio = (pixelX - startX) / (endX - startX);
+            const cm = startCm + (ratio * (endCm - startCm));
+            return cm;
+        }
+
+        function calculateGrade(scoreCm) {
+            const matrix = napfaScoring[genderSelect.value][ageSelect.value];
+            if (scoreCm >= matrix.A) return "A";
+            if (scoreCm >= matrix.B) return "B";
+            if (scoreCm >= matrix.C) return "C";
+            if (scoreCm >= matrix.D) return "D";
+            if (scoreCm >= matrix.E) return "E";
+            return "Fail";
+        }
+
+        // --- MediaPipe Processing ---
+        function onResults(results) {
+            if(loadingText.style.display !== 'none') loadingText.style.display = 'none';
+
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+
+            // Draw Calibration Lines
+            const startLineX = (startSlider.value / 100) * w;
+            const endLineX = (endSlider.value / 100) * w;
+            const startCm = parseFloat(startLineCmInput.value);
+            const endCm = parseFloat(endLineCmInput.value);
+
+            // Red Start Line
+            canvasCtx.beginPath(); canvasCtx.moveTo(startLineX, 0); canvasCtx.lineTo(startLineX, h);
+            canvasCtx.strokeStyle = "red"; canvasCtx.lineWidth = 4; canvasCtx.stroke();
+            canvasCtx.fillStyle = "red"; canvasCtx.font = "20px Arial";
+            canvasCtx.fillText(`Start: ${startCm} cm`, startLineX + 10, 30);
+
+            // Green End Line
+            canvasCtx.beginPath(); canvasCtx.moveTo(endLineX, 0); canvasCtx.lineTo(endLineX, h);
+            canvasCtx.strokeStyle = "lime"; canvasCtx.lineWidth = 4; canvasCtx.stroke();
+            canvasCtx.fillStyle = "lime"; canvasCtx.fillText(`End: ${endCm} cm`, endLineX + 10, 30);
+
+            if (results.poseLandmarks && isTesting && !testCompleted) {
+                // Draw skeleton
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 1});
+
+                const landmarks = results.poseLandmarks;
+                
+                // Track Fingertips (19 = Left Index, 20 = Right Index)
+                const leftFinger = landmarks[19];
+                const rightFinger = landmarks[20];
+                
+                // Average finger position for reach (assume side profile or tracking both)
+                // Use the furthest finger along the X axis
+                const furthestFingerX = Math.max(leftFinger.x * w, rightFinger.x * w);
+                let currentCm = pixelsToCm(furthestFingerX, w);
+
+                // Foul Detection: Check Knee Angle (23=Hip, 25=Knee, 27=Ankle - assuming left leg is visible)
+                const hip = landmarks[23];
+                const knee = landmarks[25];
+                const ankle = landmarks[27];
+                const kneeAngle = calculateAngle(hip, knee, ankle);
+                
+                // If knee is bent significantly (angle < 165), it's a foul.
+                let isFoul = false;
+                if (kneeAngle < 165 && currentCm > startCm) {
+                    isFoul = true;
+                    foulWarning.classList.remove('hidden');
+                } else {
+                    foulWarning.classList.add('hidden');
+                }
+
+                if (!isFoul) {
+                    // Only record if moving forward
+                    if (currentCm > startCm) {
+                        currentReachDisplay.innerText = currentCm.toFixed(1) + " cm";
+                        
+                        // 2-Second Hold Logic
+                        const now = Date.now();
+                        
+                        // If they moved forward, reset the timer to track this new max
+                        if (currentCm > currentMaxReach + 1.0) { // +1cm buffer to avoid jitter
+                            currentMaxReach = currentCm;
+                            holdStartTime = now;
+                            holdTimerDisplay.innerText = "Holding...";
+                        } else if (currentCm >= currentMaxReach - 1.5) { 
+                            // They are holding it steadily near max reach
+                            if (holdStartTime > 0) {
+                                let heldFor = now - holdStartTime;
+                                let timeLeft = ((HOLD_DURATION - heldFor) / 1000).toFixed(1);
+                                holdTimerDisplay.innerText = timeLeft + "s";
+
+                                if (heldFor >= HOLD_DURATION) {
+                                    // Successfully held for 2 seconds
+                                    bestScore = currentMaxReach;
+                                    let grade = calculateGrade(bestScore);
+                                    finalScoreDisplay.innerText = `${bestScore.toFixed(1)} cm (Grade ${grade})`;
+                                    testCompleted = true;
+                                    statusMsg.innerText = "Test Complete! Great job.";
+                                    holdTimerDisplay.innerText = "LOCKED";
+                                }
+                            }
+                        } else {
+                            // Dropped the stretch too early
+                            holdStartTime = 0;
+                            currentMaxReach = currentCm; // Reset max to current lower point
+                            holdTimerDisplay.innerText = "Dropped";
+                        }
+                    }
+                } else {
+                    // Foul resets the hold timer
+                    holdStartTime = 0;
+                    holdTimerDisplay.innerText = "FOUL";
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        // --- Initialization ---
+        const pose = new Pose({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        }});
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await pose.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+
+        camera.start();
+    </script>
+</body>
+</html>
