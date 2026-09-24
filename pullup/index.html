@@ -22,9 +22,11 @@
 
     <div class="max-w-3xl w-full bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
         <h1 class="text-3xl font-bold text-center text-blue-400 mb-2">NAPFA Pull-Up AI Scorer</h1>
-        <p id="exerciseTypeLabel" class="text-center font-semibold text-yellow-200 mb-4 bg-yellow-900/50 py-1.5 rounded border border-yellow-700/50">
+        
+        <!-- Exercise Label -->
+        <div id="exerciseTypeLabel" class="text-center text-lg font-semibold text-yellow-200 mb-4 bg-yellow-900/50 py-2 px-4 rounded border border-yellow-700/50">
             Exercise: Inclined Pull-Ups (30 Seconds)
-        </p>
+        </div>
 
         <!-- Settings Row -->
         <div class="flex flex-col gap-4 mb-4 bg-gray-700 p-4 rounded-lg border border-gray-600">
@@ -93,6 +95,12 @@
 
         <!-- Camera Area -->
         <div class="video-container bg-black flex justify-center items-center rounded-lg overflow-hidden shadow-inner relative border border-gray-700">
+            
+            <!-- OVERLAID PERMANENT CAMERA INSTRUCTION -->
+            <div id="cameraInstruction" style="z-index: 20;" class="absolute top-0 left-0 w-full bg-black/70 text-yellow-400 font-bold text-center py-2 pointer-events-none uppercase tracking-widest text-sm shadow-md">
+                📷 Place camera on the SIDE
+            </div>
+
             <div id="loadingText" class="absolute text-gray-300 z-0 animate-pulse font-semibold">Initializing Camera...</div>
             <video id="videoElement" playsinline autoplay muted></video>
             <canvas id="canvasElement"></canvas>
@@ -156,6 +164,7 @@
         const gradeDisplay = document.getElementById('gradeDisplay');
         const formStatus = document.getElementById('formStatus');
         const exerciseTypeLabel = document.getElementById('exerciseTypeLabel');
+        const cameraInstruction = document.getElementById('cameraInstruction');
         const loadingText = document.getElementById('loadingText');
 
         const genderSelect = document.getElementById('genderSelect');
@@ -166,13 +175,11 @@
         // --- CAMERA SELECTION LOGIC ---
         async function getCameras() {
             try {
-                // Request generic camera first to prompt permissions and unlock device labels
                 activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const videoDevices = devices.filter(device => device.kind === 'videoinput');
                 
-                cameraSelect.innerHTML = ''; // Clear options
+                cameraSelect.innerHTML = ''; 
                 
                 if (videoDevices.length === 0) {
                     cameraSelect.innerHTML = '<option value="">No cameras found</option>';
@@ -186,9 +193,7 @@
                     cameraSelect.appendChild(option);
                 });
 
-                // Start the selected (first) camera
                 startCamera(cameraSelect.value);
-
             } catch (err) {
                 console.error("Error accessing camera:", err);
                 cameraSelect.innerHTML = '<option value="">Camera access denied</option>';
@@ -197,7 +202,6 @@
         }
 
         async function startCamera(deviceId) {
-            // Stop existing stream if running
             if (activeStream) {
                 activeStream.getTracks().forEach(track => track.stop());
             }
@@ -222,7 +226,7 @@
 
                 videoElement.onloadedmetadata = () => {
                     videoElement.play();
-                    processVideo(); // Start sending frames to MediaPipe
+                    processVideo(); 
                 };
             } catch (err) {
                 console.error("Error switching camera:", err);
@@ -230,14 +234,10 @@
             }
         }
 
-        // Handle dropdown change
         cameraSelect.addEventListener('change', () => {
-            if (cameraSelect.value) {
-                startCamera(cameraSelect.value);
-            }
+            if (cameraSelect.value) startCamera(cameraSelect.value);
         });
 
-        // Frame loop to feed MediaPipe
         async function processVideo() {
             if (!videoElement.paused && !videoElement.ended) {
                 await pose.send({ image: videoElement });
@@ -254,6 +254,11 @@
             currentExercise = data.type;
             
             exerciseTypeLabel.innerText = `Exercise: ${currentExercise === "Full" ? "Standard Pull-Ups" : "Inclined Pull-Ups"} (30 Seconds)`;
+            
+            // This updates the permanent overlay text
+            const cameraHint = currentExercise === "Full" ? "📷 Place camera in FRONT" : "📷 Place camera on the SIDE";
+            cameraInstruction.innerText = cameraHint;
+            
             document.getElementById('targetA').innerText = `≥ ${data.A}`;
             document.getElementById('targetB').innerText = `${data.B}-${data.A - 1}`;
             document.getElementById('targetC').innerText = `${data.C}-${data.B - 1}`;
@@ -429,7 +434,7 @@
 
         // Initialize App
         updateTargetScoreboard();
-        getCameras(); // Start requesting cameras on load
+        getCameras(); 
 
     </script>
 </body>
