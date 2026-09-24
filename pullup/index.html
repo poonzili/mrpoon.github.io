@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NAPFA Pull-Up AI Scorer (Dark Mode)</title>
+    <title>NAPFA Pull-Up AI Scorer (Dark Mode & Camera Select)</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <style>
         .video-container { position: relative; width: 100%; max-width: 640px; margin: auto; }
         video, canvas { border-radius: 0.5rem; width: 100%; height: auto; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
+        
+        /* Custom scrollbar for dark mode selects */
+        select option { background-color: #374151; color: white; }
     </style>
 </head>
 <body class="bg-gray-900 font-sans text-gray-100 flex flex-col items-center p-4 min-h-screen">
@@ -25,27 +27,39 @@
         </p>
 
         <!-- Settings Row -->
-        <div class="flex flex-wrap justify-between gap-4 mb-4 bg-gray-700 p-4 rounded-lg border border-gray-600">
-            <div>
-                <label class="font-semibold block mb-1 text-gray-300">Gender:</label>
-                <select id="genderSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="M">Male</option>
-                    <option value="F" selected>Female</option>
-                </select>
+        <div class="flex flex-col gap-4 mb-4 bg-gray-700 p-4 rounded-lg border border-gray-600">
+            
+            <!-- Top Controls: Gender, Age, Audio -->
+            <div class="flex flex-wrap justify-between gap-4">
+                <div>
+                    <label class="font-semibold block mb-1 text-gray-300">Gender:</label>
+                    <select id="genderSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="M">Male</option>
+                        <option value="F" selected>Female</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="font-semibold block mb-1 text-gray-300">Age:</label>
+                    <select id="ageSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="13">13</option>
+                        <option value="14">14</option>
+                        <option value="15">15</option>
+                        <option value="16" selected>16</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button id="toggleAudio" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors">
+                        🔊 Audio On
+                    </button>
+                </div>
             </div>
-            <div>
-                <label class="font-semibold block mb-1 text-gray-300">Age:</label>
-                <select id="ageSelect" class="bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="13">13</option>
-                    <option value="14">14</option>
-                    <option value="15">15</option>
-                    <option value="16" selected>16</option>
+
+            <!-- Bottom Controls: Camera Selection -->
+            <div class="w-full">
+                <label class="font-semibold block mb-1 text-gray-300">Select Camera:</label>
+                <select id="cameraSelect" class="w-full bg-gray-600 border border-gray-500 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Requesting camera access...</option>
                 </select>
-            </div>
-            <div class="flex items-end">
-                <button id="toggleAudio" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors">
-                    🔊 Audio On
-                </button>
             </div>
         </div>
 
@@ -79,7 +93,7 @@
 
         <!-- Camera Area -->
         <div class="video-container bg-black flex justify-center items-center rounded-lg overflow-hidden shadow-inner relative border border-gray-700">
-            <div id="loadingText" class="absolute text-gray-300 z-0 animate-pulse font-semibold">Loading AI Camera...</div>
+            <div id="loadingText" class="absolute text-gray-300 z-0 animate-pulse font-semibold">Initializing Camera...</div>
             <video id="videoElement" playsinline autoplay muted></video>
             <canvas id="canvasElement"></canvas>
         </div>
@@ -96,7 +110,7 @@
         
         <!-- Status Indicator -->
         <p id="formStatus" class="text-center mt-6 text-lg font-semibold text-gray-400">
-            Position the camera to see your upper body.
+            Select a camera and position yourself to begin.
         </p>
     </div>
 
@@ -127,10 +141,15 @@
         let currentGrade = "-";
         let currentExercise = "Inclined"; 
 
+        // Camera State
+        let activeStream = null;
+        let animationFrameId = null;
+
         // --- DOM ELEMENTS ---
         const videoElement = document.getElementById('videoElement');
         const canvasElement = document.getElementById('canvasElement');
         const canvasCtx = canvasElement.getContext('2d');
+        const cameraSelect = document.getElementById('cameraSelect');
         
         const repDisplay = document.getElementById('repDisplay');
         const timeDisplay = document.getElementById('timeDisplay');
@@ -144,6 +163,88 @@
         const startBtn = document.getElementById('startBtn');
         const resetBtn = document.getElementById('resetBtn');
 
+        // --- CAMERA SELECTION LOGIC ---
+        async function getCameras() {
+            try {
+                // Request generic camera first to prompt permissions and unlock device labels
+                activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                cameraSelect.innerHTML = ''; // Clear options
+                
+                if (videoDevices.length === 0) {
+                    cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+                    return;
+                }
+
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                // Start the selected (first) camera
+                startCamera(cameraSelect.value);
+
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                cameraSelect.innerHTML = '<option value="">Camera access denied</option>';
+                loadingText.innerText = "Camera Permission Denied.";
+            }
+        }
+
+        async function startCamera(deviceId) {
+            // Stop existing stream if running
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            loadingText.style.display = 'block';
+            loadingText.innerText = "Connecting to camera...";
+
+            const constraints = {
+                video: {
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            };
+
+            try {
+                activeStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = activeStream;
+
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    processVideo(); // Start sending frames to MediaPipe
+                };
+            } catch (err) {
+                console.error("Error switching camera:", err);
+                loadingText.innerText = "Error loading camera.";
+            }
+        }
+
+        // Handle dropdown change
+        cameraSelect.addEventListener('change', () => {
+            if (cameraSelect.value) {
+                startCamera(cameraSelect.value);
+            }
+        });
+
+        // Frame loop to feed MediaPipe
+        async function processVideo() {
+            if (!videoElement.paused && !videoElement.ended) {
+                await pose.send({ image: videoElement });
+            }
+            animationFrameId = requestAnimationFrame(processVideo);
+        }
+
         // --- TARGET SCOREBOARD UPDATE LOGIC ---
         function updateTargetScoreboard() {
             const gender = genderSelect.value;
@@ -152,7 +253,6 @@
 
             currentExercise = data.type;
             
-            // Update UI Labels
             exerciseTypeLabel.innerText = `Exercise: ${currentExercise === "Full" ? "Standard Pull-Ups" : "Inclined Pull-Ups"} (30 Seconds)`;
             document.getElementById('targetA').innerText = `≥ ${data.A}`;
             document.getElementById('targetB').innerText = `${data.B}-${data.A - 1}`;
@@ -213,7 +313,7 @@
             timeLeft = 30;
             currentGrade = "-";
             updateDisplays();
-            formStatus.innerText = "Position the camera to see your upper body.";
+            formStatus.innerText = "Select a camera and position yourself to begin.";
             formStatus.className = "text-center mt-6 text-lg font-semibold text-gray-400";
         });
 
@@ -327,15 +427,9 @@
             canvasCtx.restore();
         });
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => await pose.send({image: videoElement}),
-            width: 640, height: 480
-        });
-
-        camera.start();
-        
-        // Initialize scoreboard on load
+        // Initialize App
         updateTargetScoreboard();
+        getCameras(); // Start requesting cameras on load
 
     </script>
 </body>
